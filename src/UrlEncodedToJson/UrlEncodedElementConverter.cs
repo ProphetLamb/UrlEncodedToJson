@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -10,6 +11,7 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace UrlEncodedToJson;
 
+[StructLayout(LayoutKind.Auto)]
 internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOptions options)
 {
     private static readonly ConditionalWeakTable<JsonSerializerOptions, TypeCache> s_typeCacheByOptions = [];
