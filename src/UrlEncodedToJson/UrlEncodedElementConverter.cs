@@ -69,11 +69,14 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         };
     }
 
-    private JsonObject RewriteObject(
-        ReadOnlySpan<char> query,
-        JsonTypeInfo typeInfo)
+    private JsonObject RewriteObject(ReadOnlySpan<char> query, JsonTypeInfo typeInfo)
     {
-        UrlEncodedObjectReader root = new(this, new(NodeOptions), typeInfo, NestingTrace.Root);
+        UrlEncodedObjectReader root = new(
+            this,
+            new(NodeOptions),
+            typeInfo,
+            NestingTrace.Root
+        );
 
         foreach (var (key, value) in new NameValueEnumerable(query))
         {
@@ -82,39 +85,39 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
                 continue;
             }
 
-            root.AddObjectValue(
-                key,
-                UriSpan.UnescapeDataString(value)
-            );
+            root.AddObjectValue(key, UriSpan.UnescapeDataString(value));
         }
 
         return root.ToJsonObject();
     }
 
-    private JsonArray RewriteEnumerable(
-        ReadOnlySpan<char> query,
-        JsonTypeInfo typeInfo)
+    private JsonArray RewriteEnumerable(ReadOnlySpan<char> query, JsonTypeInfo typeInfo)
     {
         var valueTypeInfo = GetElementTypeInfo(typeInfo, NestingTrace.Root);
-        UrlEncodedArrayReader array = new(this, new(NodeOptions), valueTypeInfo, NestingTrace.Root);
+        UrlEncodedArrayReader array = new(
+            this,
+            new(NodeOptions),
+            valueTypeInfo,
+            NestingTrace.Root
+        );
 
         foreach (var (key, value) in new NameValueEnumerable(query))
         {
-            array.AddArrayValue(
-                value.IsEmpty ? "" : key,
-                UriSpan.UnescapeDataString(value.IsEmpty ? key : value)
-            );
+            array.AddArrayValue(value.IsEmpty ? "" : key, UriSpan.UnescapeDataString(value.IsEmpty ? key : value));
         }
 
         return array.ToJsonArray();
     }
 
-    private JsonObject RewriteDictionary(
-        ReadOnlySpan<char> query,
-        JsonTypeInfo typeInfo)
+    private JsonObject RewriteDictionary(ReadOnlySpan<char> query, JsonTypeInfo typeInfo)
     {
         var valueTypeInfo = GetElementTypeInfo(typeInfo, NestingTrace.Root);
-        UrlEncodedObjectReader root = new(this, new(NodeOptions), valueTypeInfo, NestingTrace.Root);
+        UrlEncodedObjectReader root = new(
+            this,
+            new(NodeOptions),
+            valueTypeInfo,
+            NestingTrace.Root
+        );
 
         foreach (var (key, value) in new NameValueEnumerable(query))
         {
@@ -123,18 +126,13 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
                 continue;
             }
 
-            root.AddDictionaryValue(
-                key,
-                UriSpan.UnescapeDataString(value)
-            );
+            root.AddDictionaryValue(key, UriSpan.UnescapeDataString(value));
         }
 
         return root.ToJsonObject();
     }
 
-    private JsonNode? RewriteScalar(
-        ReadOnlySpan<char> query,
-        JsonTypeInfo typeInfo)
+    private JsonNode? RewriteScalar(ReadOnlySpan<char> query, JsonTypeInfo typeInfo)
     {
         var enumerator = new NameValueEnumerator(query);
 
@@ -171,21 +169,17 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
     {
         var queryIndex = input.IndexOf('?');
 
-        var queryAndFragment = queryIndex < 0
-            ? input
-            : input[Math.Min(input.Length, queryIndex + 1)..];
+        var queryAndFragment = queryIndex < 0 ? input : input[Math.Min(input.Length, queryIndex + 1)..];
 
         var fragmentIndex = queryAndFragment.IndexOf('#');
 
-        return fragmentIndex < 0
-            ? queryAndFragment
-            : queryAndFragment[..fragmentIndex];
+        return fragmentIndex < 0 ? queryAndFragment : queryAndFragment[..fragmentIndex];
     }
 
     internal JsonNode? StringToValue(string value, JsonTypeInfo typeInfo)
     {
         var type = Nullable.GetUnderlyingType(typeInfo.Type) ?? typeInfo.Type;
-        if (type == typeof(string))
+        if (type == typeof(string) || type == typeof(char))
         {
             return JsonValue.Create(value, NodeOptions);
         }
@@ -200,19 +194,13 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
         if (type == typeof(bool))
         {
-            return bool.TryParse(value, out var boolValue)
-                ? JsonValue.Create(boolValue, NodeOptions)
-                : JsonValue.Create(value, NodeOptions);
+            return CreateBooleanNode(value) ?? JsonValue.Create(value, NodeOptions);
         }
 
         if (type.IsPrimitive || type == typeof(decimal) || type.IsEnum)
         {
-            // Some enums are passed as string
-            // Floating point literals NaN Inf -Inf are passed as string
-            return (value.Length < 3 || char.IsDigit(value[1])) &&
-                   double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)
-                ? JsonNode.Parse(value, NodeOptions, DocumentOptions)
-                : JsonValue.Create(value, NodeOptions);
+            return (value.AsSpan().IndexOfAny("0123456789") >= 0 ? CreateNumberNode(value) : null)
+                   ?? JsonValue.Create(value, NodeOptions);
         }
 
         // For the remainder it is trail and error
@@ -228,17 +216,9 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             return JsonValue.Create(value, NodeOptions);
         }
 
-        if ((serializeAsKind & SerializeAsKind.Boolean) != default)
+        if ((serializeAsKind & SerializeAsKind.Boolean) != default && CreateBooleanNode(value) is { } booleanNode)
         {
-            if (value.Equals("true", StringComparison.Ordinal))
-            {
-                return JsonValue.Create(true, NodeOptions);
-            }
-
-            if (value.Equals("false", StringComparison.Ordinal))
-            {
-                return JsonValue.Create(false, NodeOptions);
-            }
+            return booleanNode;
         }
 
         if ((serializeAsKind & SerializeAsKind.Null) != default && value.Equals("null", StringComparison.Ordinal))
@@ -246,39 +226,9 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             return null;
         }
 
-        if ((serializeAsKind & SerializeAsKind.Number) != default)
+        if ((serializeAsKind & SerializeAsKind.Number) != default && CreateNumberNode(value) is { } numberNode)
         {
-            // create a token with the highest precision possible
-            if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue))
-            {
-                return JsonValue.Create(longValue, NodeOptions);
-            }
-            if (ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ulongValue))
-            {
-                return JsonValue.Create(ulongValue, NodeOptions);
-            }
-#if NET8_0_OR_GREATER
-            // JsonValue.Create overload is missing the primitive overload for the JsonMetadataServices.Int128Converter
-            // we must rely on the options providing the type info
-            if (options.GetTypeInfo(typeof(Int128)) is JsonTypeInfo<Int128> i128Type &&
-                Int128.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i128Value))
-            {
-                return JsonValue.Create(i128Value, i128Type, NodeOptions);
-            }
-            if (options.GetTypeInfo(typeof(UInt128)) is JsonTypeInfo<UInt128> u128Type &&
-                UInt128.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var u128Value))
-            {
-                return JsonValue.Create(u128Value, u128Type, NodeOptions);
-            }
-#endif
-            if (decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue))
-            {
-                return JsonValue.Create(decimalValue, NodeOptions);
-            }
-            if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var doubleValue))
-            {
-                return JsonValue.Create(doubleValue, NodeOptions);
-            }
+            return numberNode;
         }
 
         try
@@ -289,6 +239,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             {
                 _typeCache.AddSerializeAsKind(typeInfo, nodeKind);
             }
+
             return reserialized;
         }
         catch
@@ -313,6 +264,91 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         }
     }
 
+    private JsonValue? CreateNumberNode(string value)
+    {
+        // create a token with the highest precision possible
+        if (long.TryParse(
+                value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var longValue
+            ))
+        {
+            return JsonValue.Create(longValue, NodeOptions);
+        }
+
+        if (ulong.TryParse(
+                value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var ulongValue
+            ))
+        {
+            return JsonValue.Create(ulongValue, NodeOptions);
+        }
+#if NET8_0_OR_GREATER
+        // JsonValue.Create overload is missing the primitive overload for the JsonMetadataServices.Int128Converter
+        // we must rely on the options providing the type info
+        if (options.GetTypeInfo(typeof(Int128)) is JsonTypeInfo<Int128> i128Type
+            && Int128.TryParse(
+                value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var i128Value
+            ))
+        {
+            return JsonValue.Create(i128Value, i128Type, NodeOptions);
+        }
+
+        if (options.GetTypeInfo(typeof(UInt128)) is JsonTypeInfo<UInt128> u128Type
+            && UInt128.TryParse(
+                value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var u128Value
+            ))
+        {
+            return JsonValue.Create(u128Value, u128Type, NodeOptions);
+        }
+#endif
+        if (decimal.TryParse(
+                value,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var decimalValue
+            ))
+        {
+            return JsonValue.Create(decimalValue, NodeOptions);
+        }
+
+        if (double.TryParse(
+                value,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var doubleValue
+            ))
+        {
+            return JsonValue.Create(doubleValue, NodeOptions);
+        }
+
+        return null;
+    }
+
+    private JsonValue? CreateBooleanNode(string value)
+    {
+        if (value.Equals("true", StringComparison.Ordinal))
+        {
+            return JsonValue.Create(true, NodeOptions);
+        }
+
+        if (value.Equals("false", StringComparison.Ordinal))
+        {
+            return JsonValue.Create(false, NodeOptions);
+        }
+
+        return null;
+    }
+
     public JsonTypeInfo GetTypeInfo(Type type)
     {
         return options.GetTypeInfo(type);
@@ -330,10 +366,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
     private static JsonNodeOptions GetNodeOptions(JsonSerializerOptions options)
     {
-        return new()
-        {
-            PropertyNameCaseInsensitive = options.PropertyNameCaseInsensitive,
-        };
+        return new() { PropertyNameCaseInsensitive = options.PropertyNameCaseInsensitive, };
     }
 
     private static JsonDocumentOptions GetDocumentOptions(JsonSerializerOptions options)
@@ -350,25 +383,22 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
     [DoesNotReturn, MethodImpl(MethodImplOptions.NoInlining)]
     internal static void ThrowInvalidLeafTypeException(NestingTrace trace, string value, JsonTypeInfo typeInfo)
     {
-        throw new JsonException("Unable to convert the value to the desired type: Expected a enumerable, or simple value according to metadata, but got a dictionary or object type", trace.ToString(), null, null)
-        {
-            Data =
-            {
-                ["Value"] = value,
-                ["TypeInfo"] = typeInfo
-            }
-        };
+        throw new JsonException(
+            "Unable to convert the value to the desired type: Expected a enumerable, or simple value according to metadata, but got a dictionary or object type",
+            trace.ToString(),
+            null,
+            null
+        ) { Data = { ["Value"] = value, ["TypeInfo"] = typeInfo } };
     }
 
     [DoesNotReturn, MethodImpl(MethodImplOptions.NoInlining)]
     internal static Type ThrowMissingElementTypeException(NestingTrace trace, JsonTypeInfo typeInfo)
     {
-        throw new JsonException("Unable to convert the value to the desired type: Expected an enumerable or dictionary according to metadata, but got a object, simple value", trace.ToString(), null, null)
-        {
-            Data =
-            {
-                ["TypeInfo"] = typeInfo
-            }
-        };
+        throw new JsonException(
+            "Unable to convert the value to the desired type: Expected an enumerable or dictionary according to metadata, but got a object, simple value",
+            trace.ToString(),
+            null,
+            null
+        ) { Data = { ["TypeInfo"] = typeInfo } };
     }
 }
