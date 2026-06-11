@@ -14,7 +14,7 @@ internal enum SerializeAsKind : byte
     Null = 1 << 3
 }
 
-internal partial struct UrlEncodElementConverter
+internal partial struct UrlEncodedElementConverter
 {
     private sealed class TypeCache(ConcurrentDictionary<JsonTypeInfo, Dictionary<string, JsonPropertyInfo>> propertyInfoByTypeInfo, ConcurrentDictionary<JsonTypeInfo, SerializeAsKind> serializeAsKindByTypeInfo)
     {

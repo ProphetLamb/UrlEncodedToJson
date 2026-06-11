@@ -3,7 +3,7 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace UrlEncodedToJson;
 
-internal readonly ref struct UrlEncodedObjectReader(UrlEncodElementConverter converter, JsonObject obj, JsonTypeInfo typeInfo, NestingTrace trace)
+internal readonly ref struct UrlEncodedObjectReader(UrlEncodedElementConverter converter, JsonObject obj, JsonTypeInfo typeInfo, NestingTrace trace)
 {
     public void AddObjectValue(
         ReadOnlySpan<char> path, string value)
@@ -13,14 +13,14 @@ internal readonly ref struct UrlEncodedObjectReader(UrlEncodElementConverter con
             return;
         }
 
-        var (escapedPropertyName, remainingPath) = UrlEncodElementConverter.TakeFromPath(path);
+        var (escapedPropertyName, remainingPath) = UrlEncodedElementConverter.TakeFromPath(path);
 
         if (escapedPropertyName.IsEmpty)
         {
             return;
         }
 
-        var propertyInfo = converter.FindProperty(typeInfo, UrlEncodElementConverter.UnescapeQueryComponent(escapedPropertyName));
+        var propertyInfo = converter.FindProperty(typeInfo, UrlEncodedElementConverter.UnescapeQueryComponent(escapedPropertyName));
 
         if (propertyInfo is null)
         {
@@ -56,8 +56,8 @@ internal readonly ref struct UrlEncodedObjectReader(UrlEncodElementConverter con
 
     public void AddDictionaryValue(ReadOnlySpan<char> path, string value)
     {
-        var (escapedKey, childPath) = UrlEncodElementConverter.TakeFromPath(path);
-        var key = UrlEncodElementConverter.UnescapeQueryComponent(escapedKey);
+        var (escapedKey, childPath) = UrlEncodedElementConverter.TakeFromPath(path);
+        var key = UrlEncodedElementConverter.UnescapeQueryComponent(escapedKey);
         if (childPath.IsEmpty)
         {
             AddLeafValue(key, value);
@@ -90,7 +90,7 @@ internal readonly ref struct UrlEncodedObjectReader(UrlEncodElementConverter con
         switch (typeInfo.Kind)
         {
             case JsonTypeInfoKind.Enumerable:
-                GetOrCreateArray(key).Add(value);
+                GetOrCreateArray(key).Add((JsonNode)JsonValue.Create(value));
                 return;
             case JsonTypeInfoKind.None:
                 obj[key] = converter.StringToValue(value, typeInfo);
@@ -98,7 +98,7 @@ internal readonly ref struct UrlEncodedObjectReader(UrlEncodElementConverter con
             case JsonTypeInfoKind.Object:
             case JsonTypeInfoKind.Dictionary:
             default:
-                UrlEncodElementConverter.ThrowInvalidLeafTypeException(trace[key], value, typeInfo);
+                UrlEncodedElementConverter.ThrowInvalidLeafTypeException(trace[key], value, typeInfo);
                 return;
         }
     }

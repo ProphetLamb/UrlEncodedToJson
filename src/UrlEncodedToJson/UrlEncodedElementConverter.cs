@@ -10,26 +10,19 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace UrlEncodedToJson;
 
-internal readonly partial struct UrlEncodElementConverter(JsonSerializerOptions options)
+internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOptions options)
 {
     private static readonly ConditionalWeakTable<JsonSerializerOptions, TypeCache> s_typeCacheByOptions = [];
 
     private readonly TypeCache _typeCache = GetOrCreateTypeCache(options);
-
-    public UrlEncodElementConverter() : this(JsonSerializerOptions.Default)
-    {
-    }
 
 
     internal JsonNodeOptions NodeOptions => GetNodeOptions(options);
 
     internal JsonDocumentOptions DocumentOptions => GetDocumentOptions(options);
 
-    internal JsonWriterOptions WriterOptions => GetWriterOptions(options);
-
-
     [Pure]
-    public string? Deserialize(JsonElement element, JsonTypeInfo typeInfo)
+    public string Deserialize(JsonElement element, JsonTypeInfo typeInfo)
     {
         ArrayBufferWriter<char> writer = new();
         UrlEncodedWriter queryWriter = new(this, null, writer);
@@ -251,15 +244,15 @@ internal readonly partial struct UrlEncodElementConverter(JsonSerializerOptions 
             }
             if (ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ulongValue))
             {
-                return JsonValue.Create(longValue);
+                return JsonValue.Create(ulongValue);
             }
             if (decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue))
             {
-                return JsonValue.Create(longValue);
+                return JsonValue.Create(decimalValue);
             }
             if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var doubleValue))
             {
-                return JsonValue.Create(longValue);
+                return JsonValue.Create(doubleValue);
             }
         }
 
@@ -364,16 +357,9 @@ internal readonly partial struct UrlEncodElementConverter(JsonSerializerOptions 
         return result;
     }
 
-    private static TypeCache GetOrCreateTypeCache(JsonSerializerOptions? options)
+    private static TypeCache GetOrCreateTypeCache(JsonSerializerOptions options)
     {
-        options ??= JsonSerializerOptions.Default;
-        options.MakeReadOnly(true);
         return s_typeCacheByOptions.GetValue(options, static _ => new([], []));
-    }
-
-    private static JsonElement ParseElement(ReadOnlySpan<char> json, JsonSerializerOptions? options)
-    {
-        return JsonElement.Parse(json, GetDocumentOptions(options ?? JsonSerializerOptions.Default));
     }
 
     private static JsonNodeOptions GetNodeOptions(JsonSerializerOptions options)
@@ -392,20 +378,6 @@ internal readonly partial struct UrlEncodElementConverter(JsonSerializerOptions 
             AllowDuplicateProperties = options.AllowDuplicateProperties,
             CommentHandling = options.ReadCommentHandling,
             MaxDepth = options.MaxDepth,
-        };
-    }
-
-    private static JsonWriterOptions GetWriterOptions(JsonSerializerOptions options)
-    {
-        return new()
-        {
-            Encoder = options.Encoder,
-            Indented = options.WriteIndented,
-            MaxDepth = options.MaxDepth,
-            SkipValidation = true,
-            IndentCharacter = options.IndentCharacter,
-            IndentSize = options.IndentSize,
-            NewLine = options.NewLine,
         };
     }
 

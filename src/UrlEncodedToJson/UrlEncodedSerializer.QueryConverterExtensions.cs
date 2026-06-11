@@ -17,7 +17,7 @@ public partial class UrlEncodedSerializer
     /// <param name="json">The JSON to parse and deserialize.</param>
     /// <returns>The URL-encoded string if any; otherwise <c>null</c>.</returns>
     [Pure]
-    internal static string? Deserialize<T>(this UrlEncodElementConverter converter, ReadOnlySpan<char> json)
+    internal static string? Deserialize<T>(this UrlEncodedElementConverter converter, ReadOnlySpan<char> json)
     {
         return converter.Deserialize<T>(ParseElement(converter, json));
     }
@@ -31,7 +31,7 @@ public partial class UrlEncodedSerializer
     /// <param name="type">The contract type to use when deserializing.</param>
     /// <returns>The URL-encoded string if any; otherwise <c>null</c>.</returns>
     [Pure]
-    internal static string? Deserialize(this UrlEncodElementConverter converter, ReadOnlySpan<char> json, Type type)
+    internal static string? Deserialize(this UrlEncodedElementConverter converter, ReadOnlySpan<char> json, Type type)
     {
         return converter.Deserialize(ParseElement(converter, json), type);
     }
@@ -45,7 +45,7 @@ public partial class UrlEncodedSerializer
     /// <param name="converter">The converter instance.</param>
     /// <param name="json">The JSON to parse and deserialize.</param>
     /// <param name="writer">The destination buffer writer for URL-encoded bytes.</param>
-    internal static void Deserialize<T>(this UrlEncodElementConverter converter, ReadOnlySpan<char> json, IBufferWriter<byte> writer)
+    internal static void Deserialize<T>(this UrlEncodedElementConverter converter, ReadOnlySpan<char> json, IBufferWriter<byte> writer)
     {
         converter.Deserialize<T>(ParseElement(converter, json), writer);
     }
@@ -58,7 +58,7 @@ public partial class UrlEncodedSerializer
     /// <param name="json">The JSON to parse and deserialize.</param>
     /// <param name="type">The contract type.</param>
     /// <param name="writer">The URL-encoded output writer.</param>
-    internal static void Deserialize(this UrlEncodElementConverter converter, ReadOnlySpan<char> json, Type type, IBufferWriter<byte> writer)
+    internal static void Deserialize(this UrlEncodedElementConverter converter, ReadOnlySpan<char> json, Type type, IBufferWriter<byte> writer)
     {
         converter.Deserialize(ParseElement(converter, json), type, writer);
     }
@@ -71,7 +71,7 @@ public partial class UrlEncodedSerializer
     /// <param name="element">The JSON element containing the URL-encoded element.</param>
     /// <returns>The URL-encoded string if any; otherwise <c>null</c>.</returns>
     [Pure]
-    internal static string? Deserialize<T>(this UrlEncodElementConverter converter, JsonElement element)
+    internal static string? Deserialize<T>(this UrlEncodedElementConverter converter, JsonElement element)
     {
         return converter.Deserialize(element, typeof(T));
     }
@@ -84,7 +84,7 @@ public partial class UrlEncodedSerializer
     /// <param name="type">The contract type.</param>
     /// <returns>The URL-encoded element equivalent to the <paramref name="element"/>.</returns>
     [Pure]
-    internal static string? Deserialize(this UrlEncodElementConverter converter, JsonElement element, Type type)
+    internal static string? Deserialize(this UrlEncodedElementConverter converter, JsonElement element, Type type)
     {
         return converter.Deserialize(element, converter.GetTypeInfo(type));
     }
@@ -97,7 +97,7 @@ public partial class UrlEncodedSerializer
     /// <param name="converter">The converter instance.</param>
     /// <param name="element">The JSON element containing the URL-encoded element.</param>
     /// <param name="writer">The URL-encoded output writer.</param>
-    internal static void Deserialize<T>(this UrlEncodElementConverter converter, JsonElement element, IBufferWriter<byte> writer)
+    internal static void Deserialize<T>(this UrlEncodedElementConverter converter, JsonElement element, IBufferWriter<byte> writer)
     {
         converter.Deserialize(element, typeof(T), writer);
     }
@@ -110,7 +110,7 @@ public partial class UrlEncodedSerializer
     /// <param name="element">The JSON element containing the URL-encoded element.</param>
     /// <param name="type">The contract type.</param>
     /// <param name="writer">The URL-encoded output writer.</param>
-    internal static void Deserialize(this UrlEncodElementConverter converter, JsonElement element, Type type, IBufferWriter<byte> writer)
+    internal static void Deserialize(this UrlEncodedElementConverter converter, JsonElement element, Type type, IBufferWriter<byte> writer)
     {
         converter.Deserialize(element, converter.GetTypeInfo(type), writer);
     }
@@ -122,7 +122,7 @@ public partial class UrlEncodedSerializer
     /// <param name="query">The URL-encoded query text to convert to JSON.</param>
     /// <param name="typeInfo">The JSON contract information to use when serializing.</param>
     /// <param name="writer">The destination JSON writer.</param>
-    internal static void Serialize(this UrlEncodElementConverter converter, ReadOnlySpan<char> query, JsonTypeInfo typeInfo, Utf8JsonWriter writer)
+    internal static void Serialize(this UrlEncodedElementConverter converter, ReadOnlySpan<char> query, JsonTypeInfo typeInfo, Utf8JsonWriter writer)
     {
         var node = converter.SerializeToNode(query, typeInfo);
         if (node is null)
@@ -142,7 +142,7 @@ public partial class UrlEncodedSerializer
     /// <param name="query">The URL-encoded query text to convert to JSON.</param>
     /// <param name="type">The contract type.</param>
     /// <param name="writer">The destination JSON writer.</param>
-    internal static void Serialize(this UrlEncodElementConverter converter, ReadOnlySpan<char> query, Type type, Utf8JsonWriter writer)
+    internal static void Serialize(this UrlEncodedElementConverter converter, ReadOnlySpan<char> query, Type type, Utf8JsonWriter writer)
     {
         converter.Serialize(query, converter.GetTypeInfo(type), writer);
     }
@@ -154,7 +154,7 @@ public partial class UrlEncodedSerializer
     /// <param name="converter">The converter instance.</param>
     /// <param name="query">The URL-encoded query text to convert to JSON.</param>
     /// <param name="writer">The destination JSON writer.</param>
-    internal static void Serialize<T>(this UrlEncodElementConverter converter, ReadOnlySpan<char> query, Utf8JsonWriter writer)
+    internal static void Serialize<T>(this UrlEncodedElementConverter converter, ReadOnlySpan<char> query, Utf8JsonWriter writer)
     {
         converter.Serialize(query, typeof(T), writer);
     }
@@ -167,7 +167,7 @@ public partial class UrlEncodedSerializer
     /// <param name="typeInfo">The JSON contract information to use when serializing.</param>
     /// <returns>The serialized JSON string if any; otherwise <c>null</c>.</returns>
     [Pure]
-    internal static string? Serialize(this UrlEncodElementConverter converter, ReadOnlySpan<char> query, JsonTypeInfo typeInfo)
+    internal static string? Serialize(this UrlEncodedElementConverter converter, ReadOnlySpan<char> query, JsonTypeInfo typeInfo)
     {
         return converter.SerializeToNode(query, typeInfo)?.ToJsonString();
     }
@@ -180,7 +180,7 @@ public partial class UrlEncodedSerializer
     /// <param name="type">The contract type.</param>
     /// <returns>The serialized JSON string if any; otherwise <c>null</c>.</returns>
     [Pure]
-    internal static string? Serialize(this UrlEncodElementConverter converter, ReadOnlySpan<char> query, Type type)
+    internal static string? Serialize(this UrlEncodedElementConverter converter, ReadOnlySpan<char> query, Type type)
     {
         return converter.Serialize(query, converter.GetTypeInfo(type));
     }
@@ -193,7 +193,7 @@ public partial class UrlEncodedSerializer
     /// <param name="query">The URL-encoded query text to convert to JSON.</param>
     /// <returns>The serialized JSON string if any; otherwise <c>null</c>.</returns>
     [Pure]
-    internal static string? Serialize<T>(this UrlEncodElementConverter converter, ReadOnlySpan<char> query)
+    internal static string? Serialize<T>(this UrlEncodedElementConverter converter, ReadOnlySpan<char> query)
     {
         return converter.Serialize(query, typeof(T));
     }
@@ -205,7 +205,7 @@ public partial class UrlEncodedSerializer
     /// <param name="converter">The converter instance.</param>
     /// <param name="query">The URL-encoded query text to convert to a <see cref="JsonNode"/>.</param>
     /// <returns>The resulting <see cref="JsonNode"/> if any; otherwise <c>null</c>.</returns>
-    internal static JsonNode? SerializeToNode<T>(this UrlEncodElementConverter converter, ReadOnlySpan<char> query)
+    internal static JsonNode? SerializeToNode<T>(this UrlEncodedElementConverter converter, ReadOnlySpan<char> query)
     {
         return converter.SerializeToNode(query, typeof(T));
     }
@@ -217,7 +217,7 @@ public partial class UrlEncodedSerializer
     /// <param name="query">The URL-encoded query text to convert to a <see cref="JsonNode"/>.</param>
     /// <param name="type">The contract type.</param>
     /// <returns>The resulting <see cref="JsonNode"/> if any; otherwise <c>null</c>.</returns>
-    internal static JsonNode? SerializeToNode(this UrlEncodElementConverter converter, ReadOnlySpan<char> query, Type type)
+    internal static JsonNode? SerializeToNode(this UrlEncodedElementConverter converter, ReadOnlySpan<char> query, Type type)
     {
         return converter.SerializeToNode(query, converter.GetTypeInfo(type));
     }
@@ -228,7 +228,7 @@ public partial class UrlEncodedSerializer
     /// <param name="converter">The converter instance whose document options will be used for parsing.</param>
     /// <param name="json">The JSON to parse.</param>
     /// <returns>The parsed <see cref="JsonElement"/>.</returns>
-    private static JsonElement ParseElement(UrlEncodElementConverter converter, ReadOnlySpan<char> json)
+    private static JsonElement ParseElement(UrlEncodedElementConverter converter, ReadOnlySpan<char> json)
     {
         return JsonElement.Parse(json, converter.DocumentOptions);
     }

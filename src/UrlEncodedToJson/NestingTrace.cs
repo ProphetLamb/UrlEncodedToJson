@@ -34,9 +34,9 @@ internal sealed class NestingTrace(NestingTrace? parent, string? key, int index,
         return _toString ??= CreateToString();
     }
 
-    public NestingTrace this[string key] => new(this, key, -1, NestingTraceConnection.Field);
+    public NestingTrace this[string childKey] => new(this, childKey, -1, NestingTraceConnection.Field);
 
-    public NestingTrace this[int index] => new(this, null, index, NestingTraceConnection.Index);
+    public NestingTrace this[int childIndex] => new(this, null, childIndex, NestingTraceConnection.Index);
 
     private string CreateToString()
     {

@@ -7,7 +7,7 @@ using System.Text.Json.Serialization.Metadata;
 namespace UrlEncodedToJson;
 
 
-internal ref struct UrlEncodedWriter(UrlEncodElementConverter converter, IBufferWriter<byte>? byteWriter, IBufferWriter<char>? charWriter)
+internal ref struct UrlEncodedWriter(UrlEncodedElementConverter converter, IBufferWriter<byte>? byteWriter, IBufferWriter<char>? charWriter)
 {
     private bool _hasWrittenPair;
 

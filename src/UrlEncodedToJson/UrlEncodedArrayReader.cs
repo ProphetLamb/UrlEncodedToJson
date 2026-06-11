@@ -4,13 +4,13 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace UrlEncodedToJson;
 
-internal readonly ref struct UrlEncodedArrayReader(UrlEncodElementConverter converter, JsonArray array, JsonTypeInfo typeInfo, NestingTrace trace)
+internal readonly ref struct UrlEncodedArrayReader(UrlEncodedElementConverter converter, JsonArray array, JsonTypeInfo typeInfo, NestingTrace trace)
 {
     public void AddArrayValue(
         ReadOnlySpan<char> path,
         string value)
     {
-        var (escapedIndex, childPath) = UrlEncodElementConverter.TakeFromPath(path);
+        var (escapedIndex, childPath) = UrlEncodedElementConverter.TakeFromPath(path);
 
         if (!int.TryParse(escapedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) || index < 0)
         {
@@ -74,7 +74,7 @@ internal readonly ref struct UrlEncodedArrayReader(UrlEncodElementConverter conv
         switch (typeInfo.Kind)
         {
             case JsonTypeInfoKind.Enumerable:
-                GetOrCreateArray(index).Add(value);
+                GetOrCreateArray(index).Add((JsonNode)JsonValue.Create(value));
                 return;
             case JsonTypeInfoKind.None:
                 array[index] = converter.StringToValue(value, typeInfo);
@@ -82,7 +82,7 @@ internal readonly ref struct UrlEncodedArrayReader(UrlEncodElementConverter conv
             case JsonTypeInfoKind.Object:
             case JsonTypeInfoKind.Dictionary:
             default:
-                UrlEncodElementConverter.ThrowInvalidLeafTypeException(trace[index], value, typeInfo);
+                UrlEncodedElementConverter.ThrowInvalidLeafTypeException(trace[index], value, typeInfo);
                 return;
         }
     }
