@@ -69,10 +69,9 @@ internal static class UriSpan
 
                         if (runeBytes > 0)
                         {
-                            var rawLength = runeBytes * 3;
-                            var chars = input.Slice(start, rawLength);
-                            AppendRuneOrChars(ref vsb, rune[..runeBytes], chars);
-                            i = start + rawLength - 1;
+                            var chars = input.Slice(start, runeBytes * 3);
+                            var validRuneBytes = AppendRuneOrChars(ref vsb, rune[..runeBytes], chars);
+                            i = start + (validRuneBytes*3) - 1;
                         }
                         else
                         {
@@ -98,34 +97,28 @@ internal static class UriSpan
         }
     }
 
-    private static void AppendRuneOrChars(
+    private static int AppendRuneOrChars(
         scoped ref ValueStringBuilder vsb,
         Span<byte> rune,
         ReadOnlySpan<char> chars)
     {
-        for (var pivot = 0; pivot < rune.Length;)
-        {
-            // Validate UTF8
-            if (
+        // Attempt to write the complete rune
+        if (
 #if NETCOREAPP3_0_OR_GREATER
-                Rune.DecodeFromUtf8(rune[pivot..], out _, out var consumed) == System.Buffers.OperationStatus.Done
+            Rune.DecodeFromUtf8(rune, out _, out var consumed) == System.Buffers.OperationStatus.Done
 #else
-                TryDecodeUtf8(rune[pivot..], out var consumed)
+            TryDecodeUtf8(rune, out var consumed)
 #endif
-            )
-            {
-                // Decode validation
-                AppendUtf8(ref vsb, rune.Slice(pivot, consumed));
-
-                pivot += consumed;
-                continue;
-            }
-
-            // Emit raw %xx
-            vsb.Append(chars.Slice(pivot * 3, 3));
-
-            pivot += 1;
+        )
+        {
+            AppendUtf8(ref vsb, rune[..consumed]);
+            // Reanalyze the part of the %xx not part of this rune
+            return consumed;
         }
+
+        // Write the first %xx, and reanalyze the rest
+        vsb.Append(chars[..3]);
+        return 1;
     }
 
     private static void AppendUtf8(ref ValueStringBuilder vsb, ReadOnlySpan<byte> bytes)
