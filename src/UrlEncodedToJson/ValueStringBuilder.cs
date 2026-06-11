@@ -57,6 +57,13 @@ internal ref struct ValueStringBuilder(Span<char> initialBuffer, char[]? arrayFr
         _arrayFromPool = newArray;
     }
 
+    public string ToStringAndDispose()
+    {
+        var s = ToString();
+        Dispose();
+        return s;
+    }
+
     public override readonly string ToString()
     {
         return new string(_buffer[..Length]);

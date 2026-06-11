@@ -1,13 +1,10 @@
 ﻿#pragma warning disable CA2263 // Prefer generic overload when type is known
-using System;
 using System.Buffers;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using NUnit.Framework;
 
 namespace UrlEncodedToJson.Tests;
 

@@ -3,10 +3,14 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace UrlEncodedToJson;
 
-internal readonly ref struct UrlEncodedObjectReader(UrlEncodedElementConverter converter, JsonObject obj, JsonTypeInfo typeInfo, NestingTrace trace)
+internal readonly ref struct UrlEncodedObjectReader(
+    UrlEncodedElementConverter converter,
+    JsonObject obj,
+    JsonTypeInfo typeInfo,
+    NestingTrace trace
+)
 {
-    public void AddObjectValue(
-        ReadOnlySpan<char> path, string value)
+    public void AddObjectValue(ReadOnlySpan<char> path, string value)
     {
         if (typeInfo.Kind != JsonTypeInfoKind.Object)
         {
@@ -31,7 +35,12 @@ internal readonly ref struct UrlEncodedObjectReader(UrlEncodedElementConverter c
 
         if (remainingPath.IsEmpty)
         {
-            UrlEncodedObjectReader reader = new(converter, obj, propertyTypeInfo, trace);
+            UrlEncodedObjectReader reader = new(
+                converter,
+                obj,
+                propertyTypeInfo,
+                trace
+            );
             reader.AddLeafValue(propertyInfo.Name, value);
             return;
         }
@@ -82,15 +91,12 @@ internal readonly ref struct UrlEncodedObjectReader(UrlEncodedElementConverter c
         }
     }
 
-    private void AddLeafValue(
-        string key,
-        string value
-    )
+    private void AddLeafValue(string key, string value)
     {
         switch (typeInfo.Kind)
         {
             case JsonTypeInfoKind.Enumerable:
-                GetOrCreateArray(key).Add((JsonNode)JsonValue.Create(value));
+                GetOrCreateArray(key).Add((JsonNode)JsonValue.Create(value, converter.NodeOptions));
                 return;
             case JsonTypeInfoKind.None:
                 obj[key] = converter.StringToValue(value, typeInfo);

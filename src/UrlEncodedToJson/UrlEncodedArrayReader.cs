@@ -4,15 +4,24 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace UrlEncodedToJson;
 
-internal readonly ref struct UrlEncodedArrayReader(UrlEncodedElementConverter converter, JsonArray array, JsonTypeInfo typeInfo, NestingTrace trace)
+internal readonly ref struct UrlEncodedArrayReader(
+    UrlEncodedElementConverter converter,
+    JsonArray array,
+    JsonTypeInfo typeInfo,
+    NestingTrace trace
+)
 {
-    public void AddArrayValue(
-        ReadOnlySpan<char> path,
-        string value)
+    public void AddArrayValue(ReadOnlySpan<char> path, string value)
     {
         var (escapedIndex, childPath) = UrlEncodedElementConverter.TakeFromPath(path);
 
-        if (!int.TryParse(escapedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) || index < 0)
+        if (!int.TryParse(
+                escapedIndex,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var index
+            )
+            || index < 0)
         {
             array.Add(null);
             AddLeafValue(array.Count - 1, value);
@@ -53,28 +62,41 @@ internal readonly ref struct UrlEncodedArrayReader(UrlEncodedElementConverter co
     private UrlEncodedArrayReader CreateArrayReader(int index)
     {
         var t = trace[index];
-        return new(converter, GetOrCreateArray(index), converter.GetElementTypeInfo(typeInfo, t), t);
+        return new(
+            converter,
+            GetOrCreateArray(index),
+            converter.GetElementTypeInfo(typeInfo, t),
+            t
+        );
     }
 
     private UrlEncodedObjectReader CreateDictionaryReader(int index)
     {
         var t = trace[index];
-        return new(converter, GetOrCreateObject(index), converter.GetElementTypeInfo(typeInfo, t), t);
-    }
-    private UrlEncodedObjectReader GetObjectReader(int index)
-    {
-        return new(converter, GetOrCreateObject(index), typeInfo, trace[index]);
+        return new(
+            converter,
+            GetOrCreateObject(index),
+            converter.GetElementTypeInfo(typeInfo, t),
+            t
+        );
     }
 
-    private void AddLeafValue(
-        int index,
-        string value
-    )
+    private UrlEncodedObjectReader GetObjectReader(int index)
+    {
+        return new(
+            converter,
+            GetOrCreateObject(index),
+            typeInfo,
+            trace[index]
+        );
+    }
+
+    private void AddLeafValue(int index, string value)
     {
         switch (typeInfo.Kind)
         {
             case JsonTypeInfoKind.Enumerable:
-                GetOrCreateArray(index).Add((JsonNode)JsonValue.Create(value));
+                GetOrCreateArray(index).Add((JsonNode)JsonValue.Create(value, converter.NodeOptions));
                 return;
             case JsonTypeInfoKind.None:
                 array[index] = converter.StringToValue(value, typeInfo);
