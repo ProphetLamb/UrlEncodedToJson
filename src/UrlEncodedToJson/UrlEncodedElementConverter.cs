@@ -84,7 +84,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
             root.AddObjectValue(
                 key,
-                UnescapeQueryComponent(value)
+                UriSpan.UnescapeDataString(value)
             );
         }
 
@@ -102,7 +102,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         {
             array.AddArrayValue(
                 value.IsEmpty ? "" : key,
-                UnescapeQueryComponent(value.IsEmpty ? key : value)
+                UriSpan.UnescapeDataString(value.IsEmpty ? key : value)
             );
         }
 
@@ -125,7 +125,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
             root.AddDictionaryValue(
                 key,
-                UnescapeQueryComponent(value)
+                UriSpan.UnescapeDataString(value)
             );
         }
 
@@ -144,7 +144,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         }
 
         var (key, value) = enumerator.Current;
-        var valueText = UnescapeQueryComponent(value.IsEmpty ? key : value);
+        var valueText = UriSpan.UnescapeDataString(value.IsEmpty ? key : value);
         var node = StringToValue(valueText, typeInfo);
         return node;
     }
@@ -308,55 +308,6 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
     internal JsonPropertyInfo? FindProperty(JsonTypeInfo typeInfo, string propertyName)
     {
         return _typeCache.FindProperty(typeInfo, propertyName);
-    }
-
-    internal static string UnescapeQueryComponent(ReadOnlySpan<char> value)
-    {
-        if (value.IsEmpty)
-        {
-            return "";
-        }
-
-        // Uri.UnescapeDataString does not treat '+' as space.
-        // Avoid allocation unless '+' exists.
-        if (value.IndexOf('+') < 0)
-        {
-            return Uri.UnescapeDataString(
-#if NET9_0_OR_GREATER
-                value
-#else
-                value.ToString()
-#endif
-            );
-        }
-
-        var pooled = value.Length > 512 ? ArrayPool<char>.Shared.Rent(value.Length) : null;
-        var replaced = pooled ?? stackalloc char[value.Length];
-        replaced = replaced[..value.Length];
-#if NET10_0_OR_GREATER
-        value.Replace(replaced, '+', ' ');
-#else
-        for (var i = 0; i < value.Length; i++)
-        {
-            replaced[i] = value[i] switch
-            {
-                '+' => ' ',
-                var v => v,
-            };
-        }
-#endif
-        var result = Uri.UnescapeDataString(
-#if NET9_0_OR_GREATER
-            replaced
-#else
-            replaced.ToString()
-#endif
-        );
-        if (pooled != null)
-        {
-            ArrayPool<char>.Shared.Return(pooled);
-        }
-        return result;
     }
 
     private static TypeCache GetOrCreateTypeCache(JsonSerializerOptions options)

@@ -20,7 +20,7 @@ internal readonly ref struct UrlEncodedObjectReader(UrlEncodedElementConverter c
             return;
         }
 
-        var propertyInfo = converter.FindProperty(typeInfo, UrlEncodedElementConverter.UnescapeQueryComponent(escapedPropertyName));
+        var propertyInfo = converter.FindProperty(typeInfo, UriSpan.UnescapeDataString(escapedPropertyName));
 
         if (propertyInfo is null)
         {
@@ -57,7 +57,7 @@ internal readonly ref struct UrlEncodedObjectReader(UrlEncodedElementConverter c
     public void AddDictionaryValue(ReadOnlySpan<char> path, string value)
     {
         var (escapedKey, childPath) = UrlEncodedElementConverter.TakeFromPath(path);
-        var key = UrlEncodedElementConverter.UnescapeQueryComponent(escapedKey);
+        var key = UriSpan.UnescapeDataString(escapedKey);
         if (childPath.IsEmpty)
         {
             AddLeafValue(key, value);
