@@ -98,6 +98,8 @@ jobs:
 
   push-nuget:
     name: "Push NuGet Packages"
+    permissions:
+      id-token: write 
     needs: build
     if: github.event_name == 'release'
     environment:
@@ -109,9 +111,14 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: "windows-latest"
+      - name: NuGet login (OIDC → temp API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{secrets.NUGET_USER}}
       - name: "Dotnet NuGet Push"
         run: |
           Get-ChildItem .\ -Filter *.nupkg |
           Where-Object { !$_.Name.Contains('preview') } |
-          ForEach-Object { dotnet nuget push $_ --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{secrets.NUGET_API_KEY}} }
+          ForEach-Object { dotnet nuget push $_ --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{steps.login.outputs.NUGET_API_KEY}} }
         shell: pwsh
