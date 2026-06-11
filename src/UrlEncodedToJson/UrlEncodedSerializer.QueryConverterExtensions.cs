@@ -1,4 +1,3 @@
-using System;
 using System.Buffers;
 using System.Diagnostics.Contracts;
 using System.Text.Json;
@@ -7,7 +6,7 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace UrlEncodedToJson;
 
-partial class UrlEncodedSerializer
+public partial class UrlEncodedSerializer
 {
     /// <summary>
     /// Deserialize the URL-encoded element contained in the provided JSON using the contract for <typeparamref name="T"/>.
