@@ -1,15 +1,15 @@
+[![NuGet Version](https://img.shields.io/nuget/v/UrlEncodedToJson)](https://www.nuget.org/packages/UrlEncodedToJson) [![NuGet Downloads](https://img.shields.io/nuget/dt/UrlEncodedToJson)](https://www.nuget.org/packages/UrlEncodedToJson)
+
+```bash
+dotnet add package UrlEncodedToJson
+```
+
 # URL-encoded to JSON
 
 Converts elements between URL-encoded and JSON using type serialization metadata provided by `JsonSerializerOptions`.
 
 - Very fast because it rewrites syntax instead of performing expensive reflection independent of `System.Text.Json`.
 - Supports reflection-free, source generated `JsonSourceContext`.
-
-## Quickstart
-
-```bash
-dotnet add package UrlEncodedToJson
-```
 
 ```csharp
 var query = string.Join('&', [
@@ -148,13 +148,17 @@ In this case the simple value deserialization is attempted as a number.
 - If that fails, the converter catches the `JsonException`, and the simple value is treated as a string.
 - If that succeeds, the converter remembers the type can convert from a number, and always handles number as number tokens instead of text.
 
-Here the converter learns, to handle `12` as a number, instead of text.
-Then the converter learns, to handle `null` as `null`, instead of text.
-
 ```
 > Person.Age=12
 > Person.Age=null
 ```
+
+1. Here the converter learns, to handle `12` as a number, instead of text.
+2. Then the converter learns, to handle `null` as `null`, instead of text.
+
+From this point on the `AgeConverter` is no longer queried:
+- When encountering a quey value that can be interpreted as a number, then a number JSON token is generated.
+- When encountering a quey value that can be interpreted as null, then the null JSON token is generated.
 
 ```csharp
 [JsonConverter(typeof(AgeConverter))]

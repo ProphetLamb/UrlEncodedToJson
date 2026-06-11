@@ -2,7 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/UrlEncodedToJson/UrlEncodedToJson.csproj" />
   </Folder>
-  <Folder Name="/test/">
-    <Project Path="test/UrlEncodedToJson.Tests/UrlEncodedToJson.Tests.csproj" />
+  <Folder Name="/tests/">
+    <Project Path="tests/UrlEncodedToJson.Tests/UrlEncodedToJson.Tests.csproj" />
   </Folder>
 </Solution>
