@@ -221,51 +221,64 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
         // Do not handle TimeSpan or DateTime specifically as string, because they can reasonably be serialized as ticks or UNIX epoch.
 
-        if (!value.Equals("null", StringComparison.OrdinalIgnoreCase) &&
-            !value.Equals("true", StringComparison.OrdinalIgnoreCase) &&
-            !value.Equals("false", StringComparison.OrdinalIgnoreCase) &&
-            !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+        var serializeAsKind = _typeCache.CanSerializeAsKind(typeInfo);
+
+        if ((serializeAsKind & SerializeAsKind.String) != default)
         {
             return JsonValue.Create(value, NodeOptions);
         }
 
-        var serializeAsKind = _typeCache.CanSerializeAsKind(typeInfo);
         if ((serializeAsKind & SerializeAsKind.Boolean) != default)
         {
-            if (bool.TryParse(value, out var boolValue))
+            if (value.Equals("true", StringComparison.Ordinal))
             {
-                return JsonValue.Create(boolValue);
+                return JsonValue.Create(true, NodeOptions);
+            }
+
+            if (value.Equals("false", StringComparison.Ordinal))
+            {
+                return JsonValue.Create(false, NodeOptions);
             }
         }
 
-        if ((serializeAsKind & SerializeAsKind.Number) != default)
-        {
-            if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue))
-            {
-                return JsonValue.Create(longValue);
-            }
-            if (ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ulongValue))
-            {
-                return JsonValue.Create(ulongValue);
-            }
-            if (decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue))
-            {
-                return JsonValue.Create(decimalValue);
-            }
-            if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var doubleValue))
-            {
-                return JsonValue.Create(doubleValue);
-            }
-        }
-
-        if ((serializeAsKind & SerializeAsKind.Null) != default && value.Equals("null", StringComparison.OrdinalIgnoreCase))
+        if ((serializeAsKind & SerializeAsKind.Null) != default && value.Equals("null", StringComparison.Ordinal))
         {
             return null;
         }
 
-        if ((serializeAsKind & SerializeAsKind.String) != default)
+        if ((serializeAsKind & SerializeAsKind.Number) != default)
         {
-            return JsonValue.Create(value);
+            // create a token with the highest precision possible
+            if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue))
+            {
+                return JsonValue.Create(longValue, NodeOptions);
+            }
+            if (ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ulongValue))
+            {
+                return JsonValue.Create(ulongValue, NodeOptions);
+            }
+#if NET8_0_OR_GREATER
+            // JsonValue.Create overload is missing the primitive overload for the JsonMetadataServices.Int128Converter
+            // we must rely on the options providing the type info
+            if (options.GetTypeInfo(typeof(Int128)) is JsonTypeInfo<Int128> i128Type &&
+                Int128.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i128Value))
+            {
+                return JsonValue.Create(i128Value, i128Type, NodeOptions);
+            }
+            if (options.GetTypeInfo(typeof(UInt128)) is JsonTypeInfo<UInt128> u128Type &&
+                UInt128.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var u128Value))
+            {
+                return JsonValue.Create(u128Value, u128Type, NodeOptions);
+            }
+#endif
+            if (decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue))
+            {
+                return JsonValue.Create(decimalValue, NodeOptions);
+            }
+            if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var doubleValue))
+            {
+                return JsonValue.Create(doubleValue, NodeOptions);
+            }
         }
 
         try
