@@ -1,5 +1,7 @@
 ﻿using System.Buffers;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace UrlEncodedToJson;
@@ -27,233 +29,197 @@ internal static class UriSpan
     /// </summary>
     /// <param name="input">The input.</param>
     /// <param name="backingString">A string equal to <paramref name="input"/>.</param>
-    /// <returns></returns>
+    /// <returns>The unescaped query string.</returns>
     private static string UnescapeDataString(scoped ReadOnlySpan<char> input, string? backingString)
     {
-        var firstNotableIndex = input.IndexOfAny("%+");
+        var firstNotableIndex = input.IndexOfAny('%', '+');
         if (firstNotableIndex < 0)
         {
             return backingString ?? new string(input);
         }
 
         var pooled = input.Length > 512 ? ArrayPool<char>.Shared.Rent(input.Length) : null;
-        var initialBuffer = pooled ?? stackalloc char[input.Length];
-        var vsb = new ValueStringBuilder(initialBuffer, pooled);
-        Span<byte> rune = stackalloc byte[4];
+        ValueStringBuilder vsb = new(pooled ?? stackalloc char[input.Length], pooled);
 
-        try
+        vsb.Append(input[..firstNotableIndex]);
+
+        for (var i = firstNotableIndex; i < input.Length; i++)
         {
-            vsb.Append(input[..firstNotableIndex]);
-
-            for (var i = firstNotableIndex; i < input.Length; i++)
+            var c = input[i];
+            if (c == '%')
             {
-                switch (input[i])
-                {
-                    case '%':
-                    {
-                        var start = i;
-                        var runeBytes = 0;
+                i += AppendSequence(ref vsb, input[i..]);
+            }
+            else
+            {
+                vsb.Append(c == '+' ? ' ' : c);
+            }
+        }
 
-                        while (runeBytes < rune.Length && i + 2 < input.Length && IsHex(input[i + 1]) && IsHex(input[i + 2]))
-                        {
-                            rune[runeBytes++] =
-                                (byte)((FromHex(input[i + 1]) << 4) | FromHex(input[i + 2]));
+        return vsb.ToStringAndDispose();
+    }
 
-                            i += 3;
-
-                            if (i >= input.Length || input[i] != '%')
-                            {
-                                break;
-                            }
-                        }
-
-                        if (runeBytes > 0)
-                        {
-                            var chars = input.Slice(start, runeBytes * 3);
-                            var validRuneBytes = AppendRuneOrChars(ref vsb, rune[..runeBytes], chars);
-                            i = start + (validRuneBytes*3) - 1;
-                        }
-                        else
-                        {
-                            vsb.Append('%');
-                        }
-
-                        break;
-                    }
-                    case '+':
-                        vsb.Append(' ');
-                        break;
-                    default:
-                        vsb.Append(input[i]);
-                        break;
-                }
+    private static int AppendSequence(scoped ref ValueStringBuilder vsb, ReadOnlySpan<char> input)
+    {
+        uint rune = 0;
+        for (int r = 0, i = 0; r < 4; r++, i += 3)
+        {
+            if (i + 2 >= input.Length || input[i] != '%')
+            {
+                goto Invalid;
             }
 
-            return vsb.ToString();
+            var hi = FromHex(input[i + 1]);
+            var lo = FromHex(input[i + 2]);
+            if (hi > 0xf || lo > 0xf)
+            {
+                goto Invalid;
+            }
+
+            rune |= ((hi << 4) | lo) << (r * 8);
+            var validity = MeasureRune(rune, out var validRuneBytes);
+            if (validity == OperationStatus.Done)
+            {
+                // the %xx is a valid rune -> write rune
+                AppendRune(ref vsb, rune, validRuneBytes);
+                return (validRuneBytes * 3) - 1;
+            }
+
+            if (validity == OperationStatus.NeedMoreData)
+            {
+                // need more %xx to fill a rune -> next %xx
+                Debug.Assert(r < 3);
+                continue;
+            }
+
+            goto Invalid;
         }
-        finally
-        {
-            vsb.Dispose();
-        }
+
+        return 0;
+        Invalid:
+        vsb.Append(input[0]);
+        return 0;
     }
 
-    private static int AppendRuneOrChars(
-        scoped ref ValueStringBuilder vsb,
-        Span<byte> rune,
-        ReadOnlySpan<char> chars)
+    private static void AppendRune(ref ValueStringBuilder vsb, uint rune, int byteCount)
     {
-        // Attempt to write the complete rune
-        if (
-#if NETCOREAPP3_0_OR_GREATER
-            Rune.DecodeFromUtf8(rune, out _, out var consumed) == System.Buffers.OperationStatus.Done
-#else
-            TryDecodeUtf8(rune, out var consumed)
-#endif
-        )
-        {
-            AppendUtf8(ref vsb, rune[..consumed]);
-            // Reanalyze the part of the %xx not part of this rune
-            return consumed;
-        }
-
-        // Write the first %xx, and reanalyze the rest
-        vsb.Append(chars[..3]);
-        return 1;
-    }
-
-    private static void AppendUtf8(ref ValueStringBuilder vsb, ReadOnlySpan<byte> bytes)
-    {
-        var maxCharCount = Encoding.UTF8.GetMaxCharCount(bytes.Length);
-        var dest = vsb.AppendSpan(maxCharCount);
+        var dest = vsb.AppendSpan(4);
+        var bytes = MemoryMarshal.CreateReadOnlySpan(ref Unsafe.As<uint, byte>(ref rune), byteCount);
         var written = Encoding.UTF8.GetChars(bytes, dest);
-        vsb.Length -= maxCharCount - written;
+        vsb.Length -= 4 - written;
     }
 
-#if !NETCOREAPP3_0_OR_GREATER
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool TryDecodeUtf8(ReadOnlySpan<byte> source, out int bytesConsumed)
+    private static OperationStatus MeasureRune(uint rune, out int bytesConsumed)
     {
-        if (source.IsEmpty)
-        {
-            bytesConsumed = 0;
-            return false;
-        }
-
-        var b0 = source[0];
-
+        // Based on Rune.DecodeFromUtf8
+        var b0 = (byte)rune;
+        var b1 = (byte)(rune >> 0x08);
+        var b2 = (byte)(rune >> 0x10);
+        var b3 = (byte)(rune >> 0x18);
+        bytesConsumed = 1;
         // ASCII fast path
         if (b0 <= 0x7F)
         {
-            bytesConsumed = 1;
-            return true;
+            return OperationStatus.Done;
         }
 
         // Must be [C2..F4]
         if (b0 is < 0xC2 or > 0xF4)
         {
-            bytesConsumed = 1;
-            return false;
+            return OperationStatus.InvalidData;
         }
 
+        bytesConsumed = 2;
         // Need at least 1 continuation byte
-        if (source.Length < 2)
+        if (b1 == 0)
         {
-            bytesConsumed = 1;
-            return false;
+            return OperationStatus.NeedMoreData;
         }
 
-        var b1 = source[1];
         if ((b1 & 0xC0) != 0x80)
         {
-            bytesConsumed = 1;
-            return false;
+            return OperationStatus.InvalidData;
         }
 
         // 2-byte sequence
         if (b0 <= 0xDF)
         {
-            bytesConsumed = 2;
-            return true;
+            return OperationStatus.Done;
         }
 
+        bytesConsumed = 3;
         // Need at least 3 bytes
-        if (source.Length < 3)
+        if (b2 == 0)
         {
-            bytesConsumed = 1;
-            return false;
+            return OperationStatus.NeedMoreData;
         }
 
-        var b2 = source[2];
         if ((b2 & 0xC0) != 0x80)
         {
-            bytesConsumed = 1;
-            return false;
+            return OperationStatus.InvalidData;
         }
 
         // Overlong + surrogate checks (based on first two bytes)
         if (b0 == 0xE0 && b1 < 0xA0)
         {
-            return Invalid(out bytesConsumed);
+            return OperationStatus.InvalidData;
         }
 
         if (b0 == 0xED && b1 >= 0xA0)
         {
-            return Invalid(out bytesConsumed);
+            return OperationStatus.InvalidData;
         }
 
         // 3-byte sequence
         if (b0 <= 0xEF)
         {
-            bytesConsumed = 3;
-            return true;
+            return OperationStatus.Done;
         }
 
+        bytesConsumed = 4;
         // Need 4 bytes
-        if (source.Length < 4)
+        if (b3 == 0)
         {
-            bytesConsumed = 1;
-            return false;
+            return OperationStatus.NeedMoreData;
         }
 
-        var b3 = source[3];
         if ((b3 & 0xC0) != 0x80)
         {
-            bytesConsumed = 1;
-            return false;
+            return OperationStatus.InvalidData;
         }
 
         // Overlong + max range checks
         if (b0 == 0xF0 && b1 < 0x90)
         {
-            return Invalid(out bytesConsumed);
+            return OperationStatus.InvalidData;
         }
 
         if (b0 == 0xF4 && b1 >= 0x90)
         {
-            return Invalid(out bytesConsumed);
+            return OperationStatus.InvalidData;
         }
 
         // Valid 4-byte
-        bytesConsumed = 4;
-        return true;
+        return OperationStatus.Done;
+    }
 
-        static bool Invalid(out int consumed)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint FromHex(char c)
+    {
+        uint v = c;
+        var digit = v - '0';
+        if (digit < 10)
         {
-            consumed = 1;
-            return false;
+            return digit;
         }
-    }
-#endif
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsHex(char c)
-    {
-        return (uint)(c - '0') <= 9 || (uint)((c | 0x20) - 'a') <= 5;
-    }
+        var lower = v | 0x20;
+        var letter = lower - 'a';
+        if (letter < 6)
+        {
+            return letter + 10;
+        }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int FromHex(char c)
-    {
-        return c <= '9' ? c - '0' : (c | 0x20) - 'a' + 10;
+        return 0x10;
     }
 }

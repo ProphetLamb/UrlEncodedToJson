@@ -195,7 +195,7 @@ public class UriSpanTests
     {
         var random = new Random(42);
 
-        for (var t = 0; t < 1000; t++)
+        for (var t = 0; t < 10000; t++)
         {
             var chars = new char[50];
 
