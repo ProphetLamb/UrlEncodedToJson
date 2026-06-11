@@ -2,9 +2,10 @@
 
 namespace UrlEncodedToJson;
 
-internal ref struct ValueStringBuilder(Span<char> initialBuffer, char[]? _arrayFromPool = null)
+internal ref struct ValueStringBuilder(Span<char> initialBuffer, char[]? arrayFromPool = null)
 {
     private Span<char> _buffer = initialBuffer;
+    private char[]? _arrayFromPool = arrayFromPool;
     public int Length { get; set; } = 0;
 
     public void Append(char c)
@@ -24,7 +25,7 @@ internal ref struct ValueStringBuilder(Span<char> initialBuffer, char[]? _arrayF
             Grow(span.Length);
         }
 
-        span.CopyTo(_buffer.Slice(Length));
+        span.CopyTo(_buffer[Length..]);
         Length += span.Length;
     }
 
@@ -45,7 +46,7 @@ internal ref struct ValueStringBuilder(Span<char> initialBuffer, char[]? _arrayF
         var newSize = Math.Max(_buffer.Length * 2, Length + additionalCapacity);
         var newArray = ArrayPool<char>.Shared.Rent(newSize);
 
-        _buffer.Slice(0, Length).CopyTo(newArray);
+        _buffer[..Length].CopyTo(newArray);
 
         if (_arrayFromPool != null)
         {
@@ -58,7 +59,7 @@ internal ref struct ValueStringBuilder(Span<char> initialBuffer, char[]? _arrayF
 
     public override readonly string ToString()
     {
-        return new string(_buffer.Slice(0, Length));
+        return new string(_buffer[..Length]);
     }
 
     public void Dispose()
