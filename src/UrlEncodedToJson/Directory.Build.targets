@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ItemGroup>
+    <!-- Avoid compile error about missing namespace when combining ImplicitUsings with .NET Framework target frameworks. -->
+    <Using Remove="System.Net.Http" Condition="'$(TargetFrameworkIdentifier)'=='.NETFramework'"/>
+  </ItemGroup>
+  
+  <Target Name="Versioning" BeforeTargets="MinVer">
+    <PropertyGroup Label="Build">
+      <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
+      <!-- Tag your repository with the semantic version e.g. '1.0.0' to version all NuGet packages. If you have
+           multiple NuGet packages in your solution and want to version them separately, then uncomment this line
+           and tag your repository with the name of the package followed by the semantic version e.g.
+           'PackageName-1.0.0'. -->
+      <!--<MinVerTagPrefix>$(PackageId)-</MinVerTagPrefix>-->
+      <MinVerVerbosity>normal</MinVerVerbosity>
+    </PropertyGroup>
+  </Target>
+
+</Project>

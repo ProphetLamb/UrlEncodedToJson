@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Text;
 
 namespace UrlEncodedToJson;
 
@@ -13,25 +12,21 @@ internal enum NestingTraceConnection
 }
 
 [DebuggerDisplay("{ToString(),nq}")]
-internal sealed class NestingTrace
+internal sealed class NestingTrace(NestingTrace? parent, string? key, int index, NestingTraceConnection connection)
 {
     private string? _toString;
 
-    public NestingTrace? Parent { get; init; }
-    public string? Key { get; init; }
-    public int Index { get; init; }
-    public required NestingTraceConnection Connection { get; init; }
+    public NestingTrace? Parent => parent;
+    public string? Key => key;
+    public int Index => index;
+    public NestingTraceConnection Connection => connection;
 
     [field: AllowNull]
     public static NestingTrace Root => field ??= Literal("$");
 
     public static NestingTrace Literal(string path)
     {
-        return new()
-        {
-            Connection = NestingTraceConnection.Literal,
-            Key = path,
-        };
+        return new(null, path, -1, NestingTraceConnection.Literal);
     }
 
     public override string ToString()
@@ -39,19 +34,9 @@ internal sealed class NestingTrace
         return _toString ??= CreateToString();
     }
 
-    public NestingTrace this[string key] => new()
-    {
-        Connection = NestingTraceConnection.Field,
-        Key = key,
-        Parent = this,
-    };
+    public NestingTrace this[string key] => new(this, key, -1, NestingTraceConnection.Field);
 
-    public NestingTrace this[int index] => new()
-    {
-        Connection = NestingTraceConnection.Index,
-        Index = index,
-        Parent = this,
-    };
+    public NestingTrace this[int index] => new(this, null, index, NestingTraceConnection.Index);
 
     private string CreateToString()
     {

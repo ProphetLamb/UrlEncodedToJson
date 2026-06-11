@@ -1,10 +1,13 @@
 ﻿#pragma warning disable CA2263 // Prefer generic overload when type is known
+using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using NUnit.Framework;
 
 namespace UrlEncodedToJson.Tests;
 
@@ -13,7 +16,7 @@ public class Tests
     private readonly C _c = new(
         [new(12, new("Paul", "Steiner"), null!, [])],
         new(
-            new(0, new("Paul", null!), null!, ["MTB", "HEMA", "Golf"]), 
+            new(0, new("Paul", null!), null!, ["MTB", "HEMA", "Golf"]),
             DateTimeOffset.Parse("2026-06-09T16:41:12Z", CultureInfo.InvariantCulture)
         ),
         [[null, 12.45]]
@@ -153,7 +156,7 @@ public class Tests
     public void TestStronglyTypedPrimitive()
     {
         P p = new(1, new("Paul", "Steiner"), new(12), null!);
-        string query = string.Join('&', [
+        var query = string.Join('&', [
             "Id=1",
             "Name.First=Paul",
             "Name.Last=Steiner",
@@ -188,14 +191,17 @@ public class Tests
     }
 }
 
-sealed record C(IImmutableList<P> Items, M Metadata, List<List<double?>> Matrix);
-sealed record P(long Id, N Name, Age Age, IImmutableSet<string> MyInterests);
-sealed record N(string First, string Last);
-sealed record M(P Customer, [property: JsonPropertyName("Created.Ts")] DateTimeOffset CreatedTs);
-[JsonConverter(typeof(AgeConverter))]
-sealed record Age(int Value);
+internal sealed record C(IImmutableList<P> Items, M Metadata, List<List<double?>> Matrix);
 
-sealed class AgeConverter : JsonConverter<Age?>
+internal sealed record P(long Id, N Name, Age Age, IImmutableSet<string> MyInterests);
+
+internal sealed record N(string First, string Last);
+
+internal sealed record M(P Customer, [property: JsonPropertyName("Created.Ts")] DateTimeOffset CreatedTs);
+[JsonConverter(typeof(AgeConverter))]
+internal sealed record Age(int Value);
+
+internal sealed class AgeConverter : JsonConverter<Age?>
 {
     public override Age? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {

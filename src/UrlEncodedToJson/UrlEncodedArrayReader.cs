@@ -12,7 +12,7 @@ internal readonly ref struct UrlEncodedArrayReader(UrlEncodElementConverter conv
     {
         var (escapedIndex, childPath) = UrlEncodElementConverter.TakeFromPath(path);
 
-        if (!int.TryParse(escapedIndex, CultureInfo.InvariantCulture, out var index) || index < 0)
+        if (!int.TryParse(escapedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) || index < 0)
         {
             array.Add(null);
             AddLeafValue(array.Count - 1, value);

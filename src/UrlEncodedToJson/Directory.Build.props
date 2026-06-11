@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <PropertyGroup Label="Build">
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <WarningsAsErrors>Nullable</WarningsAsErrors>
+    <NoWarn>CS1591</NoWarn>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+    <EnableDynamicPlatformResolution>true</EnableDynamicPlatformResolution>
+    <RestoreUseStaticGraphEvaluation>false</RestoreUseStaticGraphEvaluation>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Publisher">
+    <Company>Prophet Lamb</Company>
+    <ApplicationPublisher>$(Company)</ApplicationPublisher>
+    <Authors>Prophet Lamb</Authors>
+    <Copyright>Copyright © 2025 Prophet Lamb. All rights reserved.</Copyright>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/ProphetLamb/UrlEncodedToJson.git</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/ProphetLamb/UrlEncodedToJson</PackageProjectUrl>
+    <PackageReleaseNotes>https://github.com/ProphetLamb/UrlEncodedToJson/releases</PackageReleaseNotes>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageLicenseFile Condition="$(PackageLicenseExpression) == ''">LICENSE</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <Description>Converts elements between URL-encoded and JSON using type serialization metadata provided by `JsonSerializerOptions`.</Description>
+    <PackageTags>JSON;URL;serialization</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Package">
+    <DebugType>embedded</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Deterministic Condition=" '$(Configuration)' == 'Release' ">true</Deterministic>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>
+      $(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb;.xml
+    </AllowedOutputExtensionsInPackageBuildOutputFolder>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../icon.png" Pack="true" PackagePath="/"/>
+    <None Include="../../README.md" Pack="true" PackagePath="/"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All"/>
+    <PackageReference Include="MinVer" PrivateAssets="all" Version="7.0.0"/>
+  </ItemGroup>
+
+  <ItemDefinitionGroup>
+    <!-- We always want MSBuild properties generated that point at the restored location of each package. -->
+    <PackageReference GeneratePathProperty="true"/>
+  </ItemDefinitionGroup>
+
+</Project>

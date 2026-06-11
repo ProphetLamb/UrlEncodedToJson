@@ -202,7 +202,7 @@ internal readonly partial struct UrlEncodElementConverter(JsonSerializerOptions 
         }
 
         // Handle types that serialize not to string, but to other JSON literals
-        // When encountering an implausible case default to string and let json handle it 
+        // When encountering an implausible case default to string and let json handle it
 
         if (type == typeof(bool))
         {
@@ -289,7 +289,6 @@ internal readonly partial struct UrlEncodElementConverter(JsonSerializerOptions 
             return JsonValue.Create(value, NodeOptions);
         }
 
-        [DebuggerDisableUserUnhandledExceptions]
         static JsonNode? ReserializeUnsafe(string value, JsonTypeInfo typeInfo)
         {
             var maxByteCount = Encoding.UTF8.GetMaxByteCount(value.Length);
@@ -328,14 +327,37 @@ internal readonly partial struct UrlEncodElementConverter(JsonSerializerOptions 
         // Avoid allocation unless '+' exists.
         if (value.IndexOf('+') < 0)
         {
-            return Uri.UnescapeDataString(value);
+            return Uri.UnescapeDataString(
+#if NET9_0_OR_GREATER
+                value
+#else
+                value.ToString()
+#endif
+            );
         }
 
         var pooled = value.Length > 512 ? ArrayPool<char>.Shared.Rent(value.Length) : null;
         var replaced = pooled ?? stackalloc char[value.Length];
         replaced = replaced[..value.Length];
+#if NET10_0_OR_GREATER
         value.Replace(replaced, '+', ' ');
-        var result = Uri.UnescapeDataString(replaced);
+#else
+        for (var i = 0; i < value.Length; i++)
+        {
+            replaced[i] = value[i] switch
+            {
+                '+' => ' ',
+                var v => v,
+            };
+        }
+#endif
+        var result = Uri.UnescapeDataString(
+#if NET9_0_OR_GREATER
+            replaced
+#else
+            replaced.ToString()
+#endif
+        );
         if (pooled != null)
         {
             ArrayPool<char>.Shared.Return(pooled);
