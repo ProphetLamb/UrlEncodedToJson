@@ -41,15 +41,13 @@ internal readonly ref struct UrlEncodedObjectReader(UrlEncodElementConverter con
             case JsonTypeInfoKind.Object:
                 CreateObjectReader(propertyInfo.Name, propertyTypeInfo).AddObjectValue(remainingPath, value);
                 break;
-
             case JsonTypeInfoKind.Dictionary:
                 CreateDictionaryReader(propertyInfo.Name, propertyTypeInfo).AddDictionaryValue(remainingPath, value);
                 break;
-
             case JsonTypeInfoKind.Enumerable:
                 CreateArrayReader(propertyInfo.Name, propertyTypeInfo).AddArrayValue(remainingPath, value);
                 break;
-
+            case JsonTypeInfoKind.None:
             default:
                 CreateLeafReader(propertyInfo.Name, propertyTypeInfo).AddLeafValue(propertyInfo.Name, value);
                 break;
@@ -71,15 +69,13 @@ internal readonly ref struct UrlEncodedObjectReader(UrlEncodElementConverter con
             case JsonTypeInfoKind.Object:
                 CreateObjectReader(key, typeInfo).AddObjectValue(childPath, value);
                 break;
-
             case JsonTypeInfoKind.Dictionary:
                 CreateDictionaryReader(key, typeInfo).AddDictionaryValue(childPath, value);
                 break;
-
             case JsonTypeInfoKind.Enumerable:
                 CreateArrayReader(key, typeInfo).AddArrayValue(childPath, value);
                 break;
-
+            case JsonTypeInfoKind.None:
             default:
                 AddLeafValue(key, value);
                 break;
@@ -99,6 +95,8 @@ internal readonly ref struct UrlEncodedObjectReader(UrlEncodElementConverter con
             case JsonTypeInfoKind.None:
                 obj[key] = converter.StringToValue(value, typeInfo);
                 return;
+            case JsonTypeInfoKind.Object:
+            case JsonTypeInfoKind.Dictionary:
             default:
                 UrlEncodElementConverter.ThrowInvalidLeafTypeException(trace[key], value, typeInfo);
                 return;

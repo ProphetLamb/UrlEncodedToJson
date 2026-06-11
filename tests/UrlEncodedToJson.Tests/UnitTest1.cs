@@ -1,6 +1,7 @@
 ﻿#pragma warning disable CA2263 // Prefer generic overload when type is known
 using System.Buffers;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -11,9 +12,13 @@ public class Tests
 {
     private readonly C _c = new(
         [new(12, new("Paul", "Steiner"), null!, [])],
-        new(new(0, new("Paul", null!), null!, ["MTB", "HEMA", "Golf"]), DateTimeOffset.Parse("2026-06-09T16:41:12Z")),
+        new(
+            new(0, new("Paul", null!), null!, ["MTB", "HEMA", "Golf"]), 
+            DateTimeOffset.Parse("2026-06-09T16:41:12Z", CultureInfo.InvariantCulture)
+        ),
         [[null, 12.45]]
     );
+
     private readonly string _query = string.Join('&', [
         "Items.0.Id=12",
         "Items.0.Name.First=Paul",
@@ -183,14 +188,14 @@ public class Tests
     }
 }
 
-record C(IImmutableList<P> Items, M Metadata, List<List<double?>> Matrix);
-record P(long Id, N Name, Age Age, IImmutableSet<string> MyInterests);
-record N(string First, string Last);
-record M(P Customer, [property: JsonPropertyName("Created.Ts")] DateTimeOffset CreatedTs);
+sealed record C(IImmutableList<P> Items, M Metadata, List<List<double?>> Matrix);
+sealed record P(long Id, N Name, Age Age, IImmutableSet<string> MyInterests);
+sealed record N(string First, string Last);
+sealed record M(P Customer, [property: JsonPropertyName("Created.Ts")] DateTimeOffset CreatedTs);
 [JsonConverter(typeof(AgeConverter))]
-record Age(int Value);
+sealed record Age(int Value);
 
-class AgeConverter : JsonConverter<Age?>
+sealed class AgeConverter : JsonConverter<Age?>
 {
     public override Age? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {

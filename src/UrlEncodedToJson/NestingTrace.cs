@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Text;
 
 namespace UrlEncodedToJson;
@@ -24,11 +25,14 @@ internal sealed class NestingTrace
     [field: AllowNull]
     public static NestingTrace Root => field ??= Literal("$");
 
-    public static NestingTrace Literal(string path) => new()
+    public static NestingTrace Literal(string path)
     {
-        Connection = NestingTraceConnection.Literal,
-        Key = path,
-    };
+        return new()
+        {
+            Connection = NestingTraceConnection.Literal,
+            Key = path,
+        };
+    }
 
     public override string ToString()
     {
@@ -51,26 +55,24 @@ internal sealed class NestingTrace
 
     private string CreateToString()
     {
-        // The recursive call is shortcircuted by dynamic programming, hence more efficient than stack iteration.
-        var p = Parent?.ToString();
-        StringBuilder b = new(p ?? "");
-        b.Append(Connection switch
+        var p = Parent?.ToString() ?? "";
+        var prefix = Connection switch
         {
             NestingTraceConnection.Field => ".",
             NestingTraceConnection.Index => "[",
             _ => ""
-        });
-        b.Append(Connection switch
+        };
+        var infix = Connection switch
         {
             NestingTraceConnection.Field => Key,
-            NestingTraceConnection.Index => Index,
+            NestingTraceConnection.Index => Index.ToString(CultureInfo.InvariantCulture),
             _ => Key
-        });
-        b.Append(Connection switch
+        };
+        var postfix = Connection switch
         {
             NestingTraceConnection.Index => "]",
             _ => ""
-        });
-        return b.ToString();
+        };
+        return $"{p}{prefix}{infix}{postfix}";
     }
 }

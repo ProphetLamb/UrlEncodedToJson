@@ -169,10 +169,7 @@ internal readonly partial struct UrlEncodElementConverter(JsonSerializerOptions 
 
     internal JsonTypeInfo GetElementTypeInfo(JsonTypeInfo typeInfo, NestingTrace trace)
     {
-        var elementType = typeInfo.ElementType ?? throw new ArgumentException($"Expected an enumerable or dictionary type, but got a simple value or custom converter at '{trace}'")
-        {
-            Data = { ["TypeInfo"] = typeInfo }
-        };
+        var elementType = typeInfo.ElementType ?? ThrowMissingElementTypeException(trace, typeInfo);
         return GetTypeInfo(elementType);
     }
 
@@ -310,9 +307,15 @@ internal readonly partial struct UrlEncodElementConverter(JsonSerializerOptions 
         }
     }
 
-    public JsonTypeInfo GetTypeInfo(Type type) => options.GetTypeInfo(type);
+    public JsonTypeInfo GetTypeInfo(Type type)
+    {
+        return options.GetTypeInfo(type);
+    }
 
-    internal JsonPropertyInfo? FindProperty(JsonTypeInfo typeInfo, string propertyName) => _typeCache.FindProperty(typeInfo, propertyName);
+    internal JsonPropertyInfo? FindProperty(JsonTypeInfo typeInfo, string propertyName)
+    {
+        return _typeCache.FindProperty(typeInfo, propertyName);
+    }
 
     internal static string UnescapeQueryComponent(ReadOnlySpan<char> value)
     {
@@ -328,8 +331,8 @@ internal readonly partial struct UrlEncodElementConverter(JsonSerializerOptions 
             return Uri.UnescapeDataString(value);
         }
 
-        char[]? pooled = value.Length > 512 ? ArrayPool<char>.Shared.Rent(value.Length) : null;
-        Span<char> replaced = pooled ?? stackalloc char[value.Length];
+        var pooled = value.Length > 512 ? ArrayPool<char>.Shared.Rent(value.Length) : null;
+        var replaced = pooled ?? stackalloc char[value.Length];
         replaced = replaced[..value.Length];
         value.Replace(replaced, '+', ' ');
         var result = Uri.UnescapeDataString(replaced);
@@ -388,11 +391,23 @@ internal readonly partial struct UrlEncodElementConverter(JsonSerializerOptions 
     [DoesNotReturn, MethodImpl(MethodImplOptions.NoInlining)]
     internal static void ThrowInvalidLeafTypeException(NestingTrace trace, string value, JsonTypeInfo typeInfo)
     {
-        throw new InvalidOperationException($"Expected a enumerable, simple value, or custom converter, but got a dictionary or object type at '{trace}'")
+        throw new JsonException("Unable to convert the value to the desired type: Expected a enumerable, or simple value according to metadata, but got a dictionary or object type", trace.ToString(), null, null)
         {
             Data =
             {
                 ["Value"] = value,
+                ["TypeInfo"] = typeInfo
+            }
+        };
+    }
+
+    [DoesNotReturn, MethodImpl(MethodImplOptions.NoInlining)]
+    internal static Type ThrowMissingElementTypeException(NestingTrace trace, JsonTypeInfo typeInfo)
+    {
+        throw new JsonException("Unable to convert the value to the desired type: Expected an enumerable or dictionary according to metadata, but got a object, simple value", trace.ToString(), null, null)
+        {
+            Data =
+            {
                 ["TypeInfo"] = typeInfo
             }
         };

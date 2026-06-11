@@ -43,7 +43,7 @@ internal readonly ref struct UrlEncodedArrayReader(UrlEncodElementConverter conv
             case JsonTypeInfoKind.Enumerable:
                 CreateArrayReader(index).AddArrayValue(childPath, value);
                 break;
-
+            case JsonTypeInfoKind.None:
             default:
                 AddLeafValue(index, value);
                 break;
@@ -79,6 +79,8 @@ internal readonly ref struct UrlEncodedArrayReader(UrlEncodElementConverter conv
             case JsonTypeInfoKind.None:
                 array[index] = converter.StringToValue(value, typeInfo);
                 return;
+            case JsonTypeInfoKind.Object:
+            case JsonTypeInfoKind.Dictionary:
             default:
                 UrlEncodElementConverter.ThrowInvalidLeafTypeException(trace[index], value, typeInfo);
                 return;

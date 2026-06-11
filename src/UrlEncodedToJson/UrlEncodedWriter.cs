@@ -32,15 +32,13 @@ internal ref struct UrlEncodedWriter(UrlEncodElementConverter converter, IBuffer
             case JsonTypeInfoKind.Object:
                 WriteObjectQueryValue(element, typeInfo, path);
                 return;
-
             case JsonTypeInfoKind.Dictionary:
                 WriteDictionaryQueryValue(element, typeInfo, path);
                 return;
-
             case JsonTypeInfoKind.Enumerable:
                 WriteEnumerableQueryValue(element, typeInfo, path, forcePrimitiveArrayIndexes);
                 return;
-
+            case JsonTypeInfoKind.None:
             default:
                 WriteScalarQueryValue(element, path);
                 return;
