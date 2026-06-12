@@ -239,6 +239,7 @@ public static partial class UrlEncodedSerializer
     [RequiresUnreferencedCode("Calls System.Text.Json.JsonSerializerOptions.Default")]
     private static UrlEncodedElementConverter ConverterForOption(JsonSerializerOptions? options)
     {
+        options?.MakeReadOnly(true);
         return new(options ?? JsonSerializerOptions.Default);
     }
 }
