@@ -1,8 +1,6 @@
-﻿using System.Buffers;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Runtime.ExceptionServices;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -37,7 +35,7 @@ public readonly struct JsonNumber(string? text, JsonNumber.NumberComponents comp
     public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, out JsonNumber result)
     {
         var success = NumberComponents.TryParse(s, out var components);
-        result = new(success ? s : null,  components);
+        result = new(success ? s : null, components);
         return success;
     }
 
@@ -193,19 +191,25 @@ public readonly struct JsonNumber(string? text, JsonNumber.NumberComponents comp
             // Require at least one digit, either before or after '.'
             if (s[integer].IsEmpty && s[fraction].IsEmpty)
             {
-                return ExceptionDispatchInfo.Capture(new FormatException("The number is missing the integer, and fraction component"));
+                return ExceptionDispatchInfo.Capture(
+                    new FormatException("The number is missing the integer, and fraction component")
+                );
             }
 
             if (ExponentRange(s, ref i) is not { } exponent)
             {
-                return ExceptionDispatchInfo.Capture(new FormatException("The exponent component of the number is invalid"));
+                return ExceptionDispatchInfo.Capture(
+                    new FormatException("The exponent component of the number is invalid")
+                );
             }
 
             // No trailing garbage allowed
             i += s.Length - s.TrimEnd().Length;
             if (i != s.Length)
             {
-                return ExceptionDispatchInfo.Capture(new FormatException("The text contains invalid data after the completed number"));
+                return ExceptionDispatchInfo.Capture(
+                    new FormatException("The text contains invalid data after the completed number")
+                );
             }
 
             components = new NumberComponents(
@@ -220,56 +224,24 @@ public readonly struct JsonNumber(string? text, JsonNumber.NumberComponents comp
 
     private sealed class JsonConverter : JsonConverter<JsonNumber>
     {
-        public override JsonNumber Read(
-            ref Utf8JsonReader reader,
-            Type typeToConvert,
-            JsonSerializerOptions options
-        )
+        public override JsonNumber Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.TokenType is not JsonTokenType.Number and not JsonTokenType.String)
-            {
-                throw new JsonException($"Expected number or string token, got {reader.TokenType}.");
-            }
-
             var text = GetTokenText(ref reader);
-
-            if (!TryParse(text, CultureInfo.InvariantCulture, out var result))
-            {
-                throw new JsonException($"Invalid decimal value '{text}'.");
-            }
-
-            return result;
+            return text is null ? default : Parse(text, CultureInfo.InvariantCulture);
         }
 
         public override void Write(Utf8JsonWriter writer, JsonNumber value, JsonSerializerOptions options)
         {
-            writer.WriteRawValue(value.Text ?? "null", skipInputValidation: false);
+            writer.WriteRawValue(value.Text ?? "0");
         }
 
-        private static string GetTokenText(ref Utf8JsonReader reader)
+        private static string? GetTokenText(ref Utf8JsonReader reader)
         {
-            if (reader.TokenType == JsonTokenType.String)
+            return reader.TokenType switch
             {
-                var s = reader.GetString();
-                if (string.IsNullOrWhiteSpace(s))
-                {
-                    throw new JsonException("Empty string is not a valid decimal value.");
-                }
-
-                return s.Trim();
-            }
-
-            if (reader.HasValueSequence)
-            {
-                return Encoding.UTF8.GetString(
-                    reader.ValueSequence
-#if !NET8_0_OR_GREATER
-                        .ToArray()
-#endif
-                );
-            }
-
-            return Encoding.UTF8.GetString(reader.ValueSpan);
+                JsonTokenType.String or JsonTokenType.Number => reader.GetString(),
+                _ => throw new JsonException($"Expected number or string token, got {reader.TokenType}.")
+            };
         }
     }
 }
