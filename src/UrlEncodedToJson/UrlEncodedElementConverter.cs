@@ -105,7 +105,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
         foreach (var (key, value) in new NameValueEnumerable(query))
         {
-            array.AddArrayValue(value.IsEmpty ? "" : key, UriSpan.UnescapeDataString(value.IsEmpty ? key : value));
+            array.AddArrayValueEscaped(value.IsEmpty ? "" : key, value.IsEmpty ? key : value);
         }
 
         return array.ToJsonArray();
@@ -128,7 +128,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
                 continue;
             }
 
-            root.AddDictionaryValue(key, UriSpan.UnescapeDataString(value));
+            root.AddDictionaryValueEscaped(key, value);
         }
 
         return root.ToJsonObject();
@@ -144,8 +144,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         }
 
         var (key, value) = enumerator.Current;
-        var valueText = UriSpan.UnescapeDataString(value.IsEmpty ? key : value);
-        var node = StringToValue(valueText, typeInfo);
+        var node = StringToValueEscaped(value.IsEmpty ? key : value, typeInfo);
         return node;
     }
 
@@ -178,15 +177,32 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         return fragmentIndex < 0 ? queryAndFragment : queryAndFragment[..fragmentIndex];
     }
 
-    internal JsonNode? StringToValue(string value, JsonTypeInfo typeInfo)
+    internal JsonNode? StringToValueEscaped(ReadOnlySpan<char> escapedValue, JsonTypeInfo typeInfo)
+    {
+        var pooled = escapedValue.Length > JsonConstants.StackallocCharLimit
+            ? ArrayPool<char>.Shared.Rent(escapedValue.Length)
+            : null;
+        var chars = pooled ?? stackalloc char[escapedValue.Length];
+        var written = UriSpan.UnescapeDataStringInplace(escapedValue, chars);
+        var value = written >= 0 ? chars[..written] : escapedValue;
+        var result = StringToValue(value, typeInfo);
+        if (pooled != null)
+        {
+            ArrayPool<char>.Shared.Return(pooled);
+        }
+
+        return result;
+    }
+
+    internal JsonNode? StringToValue(ReadOnlySpan<char> value, JsonTypeInfo typeInfo)
     {
         var type = Nullable.GetUnderlyingType(typeInfo.Type) ?? typeInfo.Type;
         if (type == typeof(string) || type == typeof(char))
         {
-            return JsonValue.Create(value, NodeOptions);
+            return CreateStringNode(value);
         }
 
-        if (string.IsNullOrEmpty(value))
+        if (value.IsEmpty)
         {
             return null;
         }
@@ -196,12 +212,12 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
         if (type == typeof(bool))
         {
-            return CreateBooleanNode(value) ?? JsonValue.Create(value, NodeOptions);
+            return CreateBooleanNode(value) ?? CreateStringNode(value);
         }
 
         if (type.IsPrimitive || type == typeof(decimal) || type.IsEnum)
         {
-            return CreateNumberNode(value) ?? JsonValue.Create(value, NodeOptions);
+            return CreateNumberNode(value) ?? CreateStringNode(value);
         }
 
         // Unable to statically analyze the JSON value for the type
@@ -226,7 +242,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
         if ((serializeAsKind & SerializeAsKind.String) != default)
         {
-            return JsonValue.Create(value, NodeOptions);
+            return CreateStringNode(value);
         }
 
         // If the value is one well-formed json literal: null, a number, or a boolean; attempt to deserialize the string then serialize to node,
@@ -238,7 +254,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             _typeCache.AddSerializeAsKind(typeInfo, nodeKind);
         }
 
-        return reserialized ?? JsonValue.Create(value, NodeOptions);
+        return reserialized ?? CreateStringNode(value);
 
         static object? DeserializeUnsafe(ReadOnlySpan<char> value, JsonTypeInfo typeInfo)
         {
@@ -258,7 +274,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             return result;
         }
 
-        static JsonNode? ReserializeNode(string s, JsonTypeInfo jsonTypeInfo)
+        static JsonNode? ReserializeNode(ReadOnlySpan<char> s, JsonTypeInfo jsonTypeInfo)
         {
             try
             {
@@ -272,12 +288,17 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         }
     }
 
-    private JsonValue? CreateNumberNode(string value)
+    internal JsonNode CreateStringNode(ReadOnlySpan<char> value)
     {
-        return CreateNumberNode(value, value);
+        return JsonValue.Create(value.ToString(), NodeOptions);
     }
 
-    private JsonValue? CreateNumberNode(ReadOnlySpan<char> value, string? backingString)
+    internal JsonNode CreateStringNode(string value)
+    {
+        return JsonValue.Create(value, NodeOptions);
+    }
+
+    private JsonValue? CreateNumberNode(ReadOnlySpan<char> value, string? backingString = null)
     {
         // Guards against named literals Infinity, -Infinity, NaN
         if (!JsonNumber.NumberComponents.TryParse(value, out var components))
@@ -290,7 +311,11 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         // this might be the case when using JsonSourceContext
         if (options.GetTypeInfo(typeof(JsonNumber)) is JsonTypeInfo<JsonNumber> jsonTypeInfo)
         {
-            return JsonValue.Create(new JsonNumber(backingString ?? value.ToString(), components), jsonTypeInfo, NodeOptions);
+            return JsonValue.Create(
+                new JsonNumber(backingString ?? value.ToString(), components),
+                jsonTypeInfo,
+                NodeOptions
+            );
         }
 
         var isInteger = components.IsInteger(value.Length);
@@ -372,6 +397,30 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
     public JsonTypeInfo GetTypeInfo(Type type)
     {
         return options.GetTypeInfo(type);
+    }
+
+    internal JsonPropertyInfo? FindPropertyEscaped(JsonTypeInfo typeInfo, ReadOnlySpan<char> escapedPropertyName)
+    {
+#if NET9_0_OR_GREATER
+        var pooled = escapedPropertyName.Length > JsonConstants.StackallocCharLimit
+            ? ArrayPool<char>.Shared.Rent(escapedPropertyName.Length)
+            : null;
+        var chars = pooled ?? stackalloc char[escapedPropertyName.Length];
+        var written = UriSpan.UnescapeDataStringInplace(escapedPropertyName, chars);
+        var propertyName = written >= 0 ? chars[..written] : escapedPropertyName;
+        var propertyInfo = _typeCache.FindProperty(
+            typeInfo,
+            propertyName
+        );
+        if (pooled != null)
+        {
+            ArrayPool<char>.Shared.Return(pooled);
+        }
+
+        return propertyInfo;
+#else
+        return _typeCache.FindProperty(typeInfo, UriSpan.UnescapeDataString(escapedPropertyName));
+#endif
     }
 
     internal JsonPropertyInfo? FindProperty(JsonTypeInfo typeInfo, string propertyName)

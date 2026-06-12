@@ -1,5 +1,7 @@
+using System.Buffers;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
+using UrlEncodedToJson.Serialization;
 using UrlEncodedToJson.Text;
 
 namespace UrlEncodedToJson;
@@ -13,10 +15,20 @@ internal readonly ref struct UrlEncodedObjectReader(
 {
     public void AddObjectValueEscaped(ReadOnlySpan<char> path, ReadOnlySpan<char> escapedValue)
     {
-        AddObjectValue(path, UriSpan.UnescapeDataString(escapedValue));
+        var pooled = escapedValue.Length > JsonConstants.StackallocCharLimit
+            ? ArrayPool<char>.Shared.Rent(escapedValue.Length)
+            : null;
+        var chars = pooled ?? stackalloc char[escapedValue.Length];
+        var written = UriSpan.UnescapeDataStringInplace(escapedValue, chars);
+        var value = written >= 0 ? chars[..written] : escapedValue;
+        AddObjectValue(path, value);
+        if (pooled != null)
+        {
+            ArrayPool<char>.Shared.Return(pooled);
+        }
     }
 
-    public void AddObjectValue(ReadOnlySpan<char> path, string value)
+    public void AddObjectValue(ReadOnlySpan<char> path, ReadOnlySpan<char> value)
     {
         if (typeInfo.Kind != JsonTypeInfoKind.Object)
         {
@@ -30,7 +42,7 @@ internal readonly ref struct UrlEncodedObjectReader(
             return;
         }
 
-        var propertyInfo = converter.FindProperty(typeInfo, UriSpan.UnescapeDataString(escapedPropertyName));
+        var propertyInfo = converter.FindPropertyEscaped(typeInfo, escapedPropertyName);
 
         if (propertyInfo is null)
         {
@@ -68,8 +80,22 @@ internal readonly ref struct UrlEncodedObjectReader(
                 break;
         }
     }
+    public void AddDictionaryValueEscaped(ReadOnlySpan<char> path, ReadOnlySpan<char> escapedValue)
+    {
+        var pooled = escapedValue.Length > JsonConstants.StackallocCharLimit
+            ? ArrayPool<char>.Shared.Rent(escapedValue.Length)
+            : null;
+        var chars = pooled ?? stackalloc char[escapedValue.Length];
+        var written = UriSpan.UnescapeDataStringInplace(escapedValue, chars);
+        var value = written >= 0 ? chars[..written] : escapedValue;
+        AddObjectValue(path, value);
+        if (pooled != null)
+        {
+            ArrayPool<char>.Shared.Return(pooled);
+        }
+    }
 
-    public void AddDictionaryValue(ReadOnlySpan<char> path, string value)
+    public void AddDictionaryValue(ReadOnlySpan<char> path, ReadOnlySpan<char> value)
     {
         var (escapedKey, childPath) = UrlEncodedElementConverter.TakeFromPath(path);
         var key = UriSpan.UnescapeDataString(escapedKey);
@@ -97,12 +123,12 @@ internal readonly ref struct UrlEncodedObjectReader(
         }
     }
 
-    private void AddLeafValue(string key, string value)
+    private void AddLeafValue(string key, ReadOnlySpan<char> value)
     {
         switch (typeInfo.Kind)
         {
             case JsonTypeInfoKind.Enumerable:
-                GetOrCreateArray(key).Add((JsonNode)JsonValue.Create(value, converter.NodeOptions));
+                GetOrCreateArray(key).Add((JsonNode)JsonValue.Create(value.ToString(), converter.NodeOptions));
                 return;
             case JsonTypeInfoKind.None:
                 obj[key] = converter.StringToValue(value, typeInfo);
@@ -110,7 +136,7 @@ internal readonly ref struct UrlEncodedObjectReader(
             case JsonTypeInfoKind.Object:
             case JsonTypeInfoKind.Dictionary:
             default:
-                UrlEncodedElementConverter.ThrowInvalidLeafTypeException(trace[key], value, typeInfo);
+                UrlEncodedElementConverter.ThrowInvalidLeafTypeException(trace[key], value.ToString(), typeInfo);
                 return;
         }
     }

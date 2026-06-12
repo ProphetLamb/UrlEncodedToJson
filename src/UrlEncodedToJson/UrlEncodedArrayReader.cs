@@ -1,6 +1,9 @@
+using System.Buffers;
 using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
+using UrlEncodedToJson.Serialization;
+using UrlEncodedToJson.Text;
 
 namespace UrlEncodedToJson;
 
@@ -11,7 +14,21 @@ internal readonly ref struct UrlEncodedArrayReader(
     NestingTrace trace
 )
 {
-    public void AddArrayValue(ReadOnlySpan<char> path, string value)
+    public void AddArrayValueEscaped(ReadOnlySpan<char> path, ReadOnlySpan<char> escapedValue)
+    {
+        var pooled = escapedValue.Length > JsonConstants.StackallocCharLimit
+            ? ArrayPool<char>.Shared.Rent(escapedValue.Length)
+            : null;
+        var chars = pooled ?? stackalloc char[escapedValue.Length];
+        var written = UriSpan.UnescapeDataStringInplace(escapedValue, chars);
+        var value = written >= 0 ? chars[..written] : escapedValue;
+        AddArrayValue(path, value);
+        if (pooled != null)
+        {
+            ArrayPool<char>.Shared.Return(pooled);
+        }
+    }
+    public void AddArrayValue(ReadOnlySpan<char> path, ReadOnlySpan<char> value)
     {
         var (escapedIndex, childPath) = UrlEncodedElementConverter.TakeFromPath(path);
 
@@ -91,12 +108,12 @@ internal readonly ref struct UrlEncodedArrayReader(
         );
     }
 
-    private void AddLeafValue(int index, string value)
+    private void AddLeafValue(int index, ReadOnlySpan<char> value)
     {
         switch (typeInfo.Kind)
         {
             case JsonTypeInfoKind.Enumerable:
-                GetOrCreateArray(index).Add((JsonNode)JsonValue.Create(value, converter.NodeOptions));
+                GetOrCreateArray(index).Add(converter.CreateStringNode(value));
                 return;
             case JsonTypeInfoKind.None:
                 array[index] = converter.StringToValue(value, typeInfo);
@@ -104,7 +121,7 @@ internal readonly ref struct UrlEncodedArrayReader(
             case JsonTypeInfoKind.Object:
             case JsonTypeInfoKind.Dictionary:
             default:
-                UrlEncodedElementConverter.ThrowInvalidLeafTypeException(trace[index], value, typeInfo);
+                UrlEncodedElementConverter.ThrowInvalidLeafTypeException(trace[index], value.ToString(), typeInfo);
                 return;
         }
     }

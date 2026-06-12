@@ -10,6 +10,16 @@ Converts elements between URL-encoded and JSON using type serialization metadata
 
 - Very fast because it rewrites syntax instead of performing expensive reflection independent of `System.Text.Json`.
 - Supports reflection-free, source generated `JsonSourceContext`.
+- Extremely low allocation.
+
+Parse query strings as object models:
+
+```csharp
+var name = UrlEncodedSerializer.SerializeToNode<N>("First=Paul&Last=Steiner").Deserialize<N>();
+record N(string First, string Last);
+```
+
+Supports complex types:
 
 ```csharp
 var query = string.Join('&', [

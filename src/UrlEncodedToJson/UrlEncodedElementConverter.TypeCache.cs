@@ -21,6 +21,20 @@ internal partial struct UrlEncodedElementConverter
     {
         public JsonPropertyInfo? FindProperty(JsonTypeInfo typeInfo, string propertyName)
         {
+            var dict = GetTypeProperties(typeInfo);
+            return dict.TryGetValue(propertyName, out var result) ? result : null;
+        }
+
+#if NET9_0_OR_GREATER
+        public JsonPropertyInfo? FindProperty(JsonTypeInfo typeInfo, ReadOnlySpan<char> propertyName)
+        {
+            var dict = GetTypeProperties(typeInfo);
+            return dict.GetAlternateLookup<ReadOnlySpan<char>>().TryGetValue(propertyName, out var result) ? result : null;
+        }
+#endif
+
+        private Dictionary<string, JsonPropertyInfo> GetTypeProperties(JsonTypeInfo typeInfo)
+        {
             var dict = propertyInfoByTypeInfo.GetOrAdd(typeInfo, static t =>
                 t.Properties.Aggregate(
                     new Dictionary<string, JsonPropertyInfo>(t.Properties.Count,
@@ -31,7 +45,7 @@ internal partial struct UrlEncodedElementConverter
                         return dict;
                     }
                 ));
-            return dict.TryGetValue(propertyName, out var result) ? result : null;
+            return dict;
         }
 
         public SerializeAsKind CanSerializeAsKind(JsonTypeInfo typeInfo)
@@ -39,7 +53,7 @@ internal partial struct UrlEncodedElementConverter
             return serializeAsKindByTypeInfo.TryGetValue(typeInfo, out var r) ? r : default;
         }
 
-        public static SerializeAsKind KindFromNode(JsonNode? node, string rawText)
+        public static SerializeAsKind KindFromNode(JsonNode? node, ReadOnlySpan<char> rawText)
         {
             return node?.GetValueKind() switch
             {
