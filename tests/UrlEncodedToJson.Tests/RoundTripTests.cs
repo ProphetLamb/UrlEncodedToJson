@@ -8,7 +8,7 @@ using System.Text.Json.Serialization;
 
 namespace UrlEncodedToJson.Tests;
 
-public class Tests
+public class RoundTripTests
 {
     private readonly C _c = new(
         [new(12, new("Paul", "Steiner"), null!, [])],

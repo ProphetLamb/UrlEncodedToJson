@@ -1,4 +1,4 @@
-namespace UrlEncodedToJson;
+namespace UrlEncodedToJson.Text;
 
 internal readonly ref struct NameValue(ReadOnlySpan<char> key, ReadOnlySpan<char> value)
 {

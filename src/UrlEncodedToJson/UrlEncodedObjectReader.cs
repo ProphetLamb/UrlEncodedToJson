@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
+using UrlEncodedToJson.Text;
 
 namespace UrlEncodedToJson;
 
@@ -10,6 +11,11 @@ internal readonly ref struct UrlEncodedObjectReader(
     NestingTrace trace
 )
 {
+    public void AddObjectValueEscaped(ReadOnlySpan<char> path, ReadOnlySpan<char> escapedValue)
+    {
+        AddObjectValue(path, UriSpan.UnescapeDataString(escapedValue));
+    }
+
     public void AddObjectValue(ReadOnlySpan<char> path, string value)
     {
         if (typeInfo.Kind != JsonTypeInfoKind.Object)

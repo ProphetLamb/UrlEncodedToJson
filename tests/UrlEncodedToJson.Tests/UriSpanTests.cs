@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using UrlEncodedToJson.Text;
 
 namespace UrlEncodedToJson.Tests;
 
@@ -8,7 +9,7 @@ using System;
 using System.Text;
 
 [TestFixture]
-[SuppressMessage("Naming", "CA1707:Bezeichner dürfen keine Unterstriche enthalten")]
+[SuppressMessage("Naming", "CA1707:Identifiers should not contain underscores")]
 public class UriSpanTests
 {
     [Test]

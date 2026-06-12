@@ -2,12 +2,15 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
 using System.Globalization;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
+using UrlEncodedToJson.Serialization;
+using UrlEncodedToJson.Text;
 
 namespace UrlEncodedToJson;
 
@@ -17,7 +20,6 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
     private static readonly ConditionalWeakTable<JsonSerializerOptions, TypeCache> s_typeCacheByOptions = [];
 
     private readonly TypeCache _typeCache = GetOrCreateTypeCache(options);
-
 
     internal JsonNodeOptions NodeOptions => GetNodeOptions(options);
 
@@ -85,7 +87,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
                 continue;
             }
 
-            root.AddObjectValue(key, UriSpan.UnescapeDataString(value));
+            root.AddObjectValueEscaped(key, value);
         }
 
         return root.ToJsonObject();
@@ -189,7 +191,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             return null;
         }
 
-        // Handle types that serialize not to string, but to other JSON literals
+        // Handle types that do not serialize to string
         // When encountering an implausible case default to string and let json handle it
 
         if (type == typeof(bool))
@@ -199,21 +201,17 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
         if (type.IsPrimitive || type == typeof(decimal) || type.IsEnum)
         {
-            return (value.AsSpan().IndexOfAny("0123456789") >= 0 ? CreateNumberNode(value) : null)
-                   ?? JsonValue.Create(value, NodeOptions);
+            return CreateNumberNode(value) ?? JsonValue.Create(value, NodeOptions);
         }
 
-        // For the remainder it is trail and error
-        // If the value is one well-formed json literal: null, a number, or a boolean; attempt to deserialize the string then serialize to node,
-        // otherwise as well as on failure pass the type as a string
-
-        // Do not handle TimeSpan or DateTime specifically as string, because they can reasonably be serialized as ticks or UNIX epoch.
-
+        // Unable to statically analyze the JSON value for the type
+        // We have to learn by deserializing the value, then serializing to node inspecting the JSON value kind.
+        // The result is then remembered to short circuit later calls.
         var serializeAsKind = _typeCache.CanSerializeAsKind(typeInfo);
 
-        if ((serializeAsKind & SerializeAsKind.String) != default)
+        if ((serializeAsKind & SerializeAsKind.Null) != default && JsonConstants.IsNullLiteral(value))
         {
-            return JsonValue.Create(value, NodeOptions);
+            return null;
         }
 
         if ((serializeAsKind & SerializeAsKind.Boolean) != default && CreateBooleanNode(value) is { } booleanNode)
@@ -221,53 +219,85 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             return booleanNode;
         }
 
-        if ((serializeAsKind & SerializeAsKind.Null) != default && value.Equals("null", StringComparison.Ordinal))
-        {
-            return null;
-        }
-
         if ((serializeAsKind & SerializeAsKind.Number) != default && CreateNumberNode(value) is { } numberNode)
         {
             return numberNode;
         }
 
-        try
-        {
-            var reserialized = ReserializeUnsafe(value, typeInfo);
-            var nodeKind = TypeCache.KindFromNode(reserialized);
-            if ((serializeAsKind | nodeKind) != serializeAsKind)
-            {
-                _typeCache.AddSerializeAsKind(typeInfo, nodeKind);
-            }
-
-            return reserialized;
-        }
-        catch
+        if ((serializeAsKind & SerializeAsKind.String) != default)
         {
             return JsonValue.Create(value, NodeOptions);
         }
 
-        static JsonNode? ReserializeUnsafe(string value, JsonTypeInfo typeInfo)
+        // If the value is one well-formed json literal: null, a number, or a boolean; attempt to deserialize the string then serialize to node,
+        // otherwise as well as on failure pass the type as a string
+        var reserialized = ReserializeNode(value, typeInfo);
+        var nodeKind = TypeCache.KindFromNode(reserialized, value);
+        if ((serializeAsKind | nodeKind) != serializeAsKind)
+        {
+            _typeCache.AddSerializeAsKind(typeInfo, nodeKind);
+        }
+
+        return reserialized ?? JsonValue.Create(value, NodeOptions);
+
+        static object? DeserializeUnsafe(ReadOnlySpan<char> value, JsonTypeInfo typeInfo)
         {
             var maxByteCount = Encoding.UTF8.GetMaxByteCount(value.Length);
-            if (maxByteCount > 512)
-            {
-                // no valid non string JSON token is this long
-                return JsonValue.Create(value, GetNodeOptions(typeInfo.Options));
-            }
-
-            Span<byte> bytes = stackalloc byte[maxByteCount];
+            var pooled = maxByteCount > JsonConstants.StackallocByteLimit
+                ? ArrayPool<byte>.Shared.Rent(maxByteCount)
+                : null;
+            var bytes = pooled ?? stackalloc byte[maxByteCount];
             bytes = bytes[..Encoding.UTF8.GetBytes(value, bytes)];
             Utf8JsonReader reader = new(bytes);
-            var boxed = JsonSerializer.Deserialize(ref reader, typeInfo);
-            return JsonSerializer.SerializeToNode(boxed, typeInfo);
+            var result = JsonSerializer.Deserialize(ref reader, typeInfo);
+            if (pooled != null)
+            {
+                ArrayPool<byte>.Shared.Return(pooled);
+            }
+
+            return result;
+        }
+
+        static JsonNode? ReserializeNode(string s, JsonTypeInfo jsonTypeInfo)
+        {
+            try
+            {
+                var boxed = DeserializeUnsafe(s, jsonTypeInfo);
+                return JsonSerializer.SerializeToNode(boxed, jsonTypeInfo);
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
         }
     }
 
     private JsonValue? CreateNumberNode(string value)
     {
-        // create a token with the highest precision possible
-        if (long.TryParse(
+        return CreateNumberNode(value, value);
+    }
+
+    private JsonValue? CreateNumberNode(ReadOnlySpan<char> value, string? backingString)
+    {
+        // Guards against named literals Infinity, -Infinity, NaN
+        if (!JsonNumber.NumberComponents.TryParse(value, out var components))
+        {
+            return null;
+        }
+
+        // Prefer unlimited precision datatypes over attempting multiple parses
+        // if the backing ITypeInfoResolver does not support JsonNumber, fallback to high precision alternatives
+        // this might be the case when using JsonSourceContext
+        if (options.GetTypeInfo(typeof(JsonNumber)) is JsonTypeInfo<JsonNumber> jsonTypeInfo)
+        {
+            return JsonValue.Create(new JsonNumber(backingString ?? value.ToString(), components), jsonTypeInfo, NodeOptions);
+        }
+
+        var isInteger = components.IsInteger(value.Length);
+
+        // Attempt alternative high precision number parse
+        if (isInteger
+            && long.TryParse(
                 value,
                 NumberStyles.Integer,
                 CultureInfo.InvariantCulture,
@@ -277,7 +307,8 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             return JsonValue.Create(longValue, NodeOptions);
         }
 
-        if (ulong.TryParse(
+        if (isInteger
+            && ulong.TryParse(
                 value,
                 NumberStyles.Integer,
                 CultureInfo.InvariantCulture,
@@ -286,31 +317,20 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         {
             return JsonValue.Create(ulongValue, NodeOptions);
         }
-#if NET8_0_OR_GREATER
-        // JsonValue.Create overload is missing the primitive overload for the JsonMetadataServices.Int128Converter
-        // we must rely on the options providing the type info
-        if (options.GetTypeInfo(typeof(Int128)) is JsonTypeInfo<Int128> i128Type
-            && Int128.TryParse(
-                value,
-                NumberStyles.Integer,
-                CultureInfo.InvariantCulture,
-                out var i128Value
-            ))
+
+        if (isInteger && options.GetTypeInfo(typeof(BigInteger)) is JsonTypeInfo<BigInteger> bigIntegerType)
         {
-            return JsonValue.Create(i128Value, i128Type, NodeOptions);
+            if (BigInteger.TryParse(
+                    value,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var bigIntegerValue
+                ))
+            {
+                return JsonValue.Create(bigIntegerValue, bigIntegerType, NodeOptions);
+            }
         }
 
-        if (options.GetTypeInfo(typeof(UInt128)) is JsonTypeInfo<UInt128> u128Type
-            && UInt128.TryParse(
-                value,
-                NumberStyles.Integer,
-                CultureInfo.InvariantCulture,
-                out var u128Value
-            ))
-        {
-            return JsonValue.Create(u128Value, u128Type, NodeOptions);
-        }
-#endif
         if (decimal.TryParse(
                 value,
                 NumberStyles.Float,
@@ -334,7 +354,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         return null;
     }
 
-    private JsonValue? CreateBooleanNode(string value)
+    private JsonValue? CreateBooleanNode(ReadOnlySpan<char> value)
     {
         if (value.Equals("true", StringComparison.Ordinal))
         {

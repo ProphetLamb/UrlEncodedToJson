@@ -3,21 +3,56 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using UrlEncodedToJson.Serialization;
 
-namespace UrlEncodedToJson;
+namespace UrlEncodedToJson.Text;
 
 internal static class UriSpan
 {
-    /// <inheritdoc cref="UnescapeDataString(ReadOnlySpan{char}, string)"/>
-    public static string UnescapeDataString(scoped ReadOnlySpan<char> input)
+    /// <inheritdoc cref="UnescapeDataStringInplace(int, ReadOnlySpan{char}, Span{char})"/>
+    public static string UnescapeDataString(scoped ReadOnlySpan<char> s)
     {
-        return UnescapeDataString(input, null);
+        return UnescapeDataString(s, null);
     }
 
-    /// <inheritdoc cref="UnescapeDataString(ReadOnlySpan{char}, string)"/>
-    public static string UnescapeDataString(string input)
+    /// <inheritdoc cref="UnescapeDataStringInplace(int, ReadOnlySpan{char}, Span{char})"/>
+    public static string UnescapeDataString(string s)
     {
-        return UnescapeDataString(input, input);
+        return UnescapeDataString(s, s);
+    }
+
+    /// <inheritdoc cref="UnescapeDataStringInplace(int, ReadOnlySpan{char}, Span{char})"/>
+    public static int UnescapeDataStringInplace(scoped ReadOnlySpan<char> s, scoped Span<char> output)
+    {
+        var firstNotableIndex = s.IndexOfAny('%', '+');
+        if (firstNotableIndex >= 0)
+        {
+            return UnescapeDataStringInplace(firstNotableIndex, s, output);
+        }
+
+        return -1;
+    }
+
+    private static string UnescapeDataString(scoped ReadOnlySpan<char> s, string? backingString)
+    {
+        var firstNotableIndex = s.IndexOfAny('%', '+');
+        if (firstNotableIndex < 0)
+        {
+            return backingString ?? new string(s);
+        }
+
+        var pooled = s.Length > JsonConstants.StackallocCharLimit
+            ? ArrayPool<char>.Shared.Rent(s.Length)
+            : null;
+        var chars = pooled ?? stackalloc char[s.Length];
+        var written = UnescapeDataStringInplace(firstNotableIndex, s, chars);
+        var result = chars[..written].ToString();
+        if (pooled != null)
+        {
+            ArrayPool<char>.Shared.Return(pooled);
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -27,28 +62,18 @@ internal static class UriSpan
     ///  <item>.NET doesn't support `ReadOnlySpan{char}` until .NET10</item>
     /// </list>
     /// </summary>
-    /// <param name="input">The input.</param>
-    /// <param name="backingString">A string equal to <paramref name="input"/>.</param>
-    /// <returns>The unescaped query string.</returns>
-    private static string UnescapeDataString(scoped ReadOnlySpan<char> input, string? backingString)
+    private static int UnescapeDataStringInplace(int firstNotableIndex, scoped ReadOnlySpan<char> s, scoped Span<char> output)
     {
-        var firstNotableIndex = input.IndexOfAny('%', '+');
-        if (firstNotableIndex < 0)
+        Debug.Assert(output.Length >= s.Length, "Output buffer must fit at least the input buffer.");
+        ValueStringBuilder vsb = new(output);
+        vsb.Append(s[..firstNotableIndex]);
+
+        for (var i = firstNotableIndex; i < s.Length; i++)
         {
-            return backingString ?? new string(input);
-        }
-
-        var pooled = input.Length > 512 ? ArrayPool<char>.Shared.Rent(input.Length) : null;
-        ValueStringBuilder vsb = new(pooled ?? stackalloc char[input.Length], pooled);
-
-        vsb.Append(input[..firstNotableIndex]);
-
-        for (var i = firstNotableIndex; i < input.Length; i++)
-        {
-            var c = input[i];
+            var c = s[i];
             if (c == '%')
             {
-                i += AppendSequence(ref vsb, input[i..]);
+                i += AppendSequence(ref vsb, s[i..]);
             }
             else
             {
@@ -56,10 +81,10 @@ internal static class UriSpan
             }
         }
 
-        return vsb.ToStringAndDispose();
+        return vsb.Length;
     }
 
-    private static int AppendSequence(scoped ref ValueStringBuilder vsb, ReadOnlySpan<char> input)
+    private static int AppendSequence(scoped ref ValueStringBuilder vsb, scoped ReadOnlySpan<char> input)
     {
         uint rune = 0;
         for (int r = 0, i = 0; r < 4; r++, i += 3)
@@ -103,10 +128,10 @@ internal static class UriSpan
 
     private static void AppendRune(ref ValueStringBuilder vsb, uint rune, int byteCount)
     {
-        var dest = vsb.AppendSpan(4);
+        var dest = vsb.AppendSpan(byteCount);
         var bytes = MemoryMarshal.CreateReadOnlySpan(ref Unsafe.As<uint, byte>(ref rune), byteCount);
         var written = Encoding.UTF8.GetChars(bytes, dest);
-        vsb.Length -= 4 - written;
+        vsb.Length -= byteCount - written;
     }
 
     private static OperationStatus MeasureRune(uint rune, out int bytesConsumed)

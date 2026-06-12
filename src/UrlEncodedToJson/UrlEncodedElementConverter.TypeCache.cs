@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
+using UrlEncodedToJson.Serialization;
 
 namespace UrlEncodedToJson;
 
@@ -30,7 +31,7 @@ internal partial struct UrlEncodedElementConverter
                         return dict;
                     }
                 ));
-            return dict.GetValueOrDefault(propertyName);
+            return dict.TryGetValue(propertyName, out var result) ? result : null;
         }
 
         public SerializeAsKind CanSerializeAsKind(JsonTypeInfo typeInfo)
@@ -38,12 +39,12 @@ internal partial struct UrlEncodedElementConverter
             return serializeAsKindByTypeInfo.TryGetValue(typeInfo, out var r) ? r : default;
         }
 
-        public static SerializeAsKind KindFromNode(JsonNode? node)
+        public static SerializeAsKind KindFromNode(JsonNode? node, string rawText)
         {
             return node?.GetValueKind() switch
             {
                 null => SerializeAsKind.Null,
-                JsonValueKind.String => SerializeAsKind.String,
+                JsonValueKind.String => JsonConstants.IsNamedFloatingPointLiteral(rawText) ? default : SerializeAsKind.String,
                 JsonValueKind.Number => SerializeAsKind.Number,
                 JsonValueKind.True or JsonValueKind.False => SerializeAsKind.Boolean,
                 _ => default,

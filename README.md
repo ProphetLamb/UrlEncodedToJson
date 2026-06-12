@@ -114,7 +114,6 @@ Example: The query `Matrix.0.1=12.45` assigns the value `12.45` to the first row
 ]
 ```
 
-
 ## Simple values
 
 Primitive types are always read from their JSON tokens:
@@ -124,7 +123,7 @@ Primitive types are always read from their JSON tokens:
 - Booleans
 - Null
 
-However, if the value is no primitive, and syntax allows for both a stirng and a number, boolean, or null, then metadata is unable to determine which JSON element to use.
+However, if the value is no primitive, and syntax allows for both a string and a number, boolean, or null, then metadata is unable to determine which JSON element to use.
 
 ### Custom converters
 
@@ -134,13 +133,13 @@ Oftentimes custom converters obiously require a text token, such as for `DateTim
 > CreatedAt=2026-06-09T16%3A41%3A12Z
 ```
 
-Conflicting text that may require converter execution are `true`, `false`, `null`, and any number. After all the a number might be text, that just happened to look like a number.
+Conflicting text that may require converter execution are `true`, `false`, `null`, and any number. After all the number might be text, that just happened to look like a number.
 
 ### Strongly typed primitives
 
 Strongly typed primitives are impossible to statically analyze, because oftentimes the syntax and data are indistinguishable from a simple value.
 
-The following strongly typed primitive is serialized as a number. However no metadata determines wether `JsonTokenType` `AgeConverter` expects a string, a boolean, or a number.
+The following strongly typed primitive is serialized as a number. However, no metadata determines whether `JsonTokenType` `AgeConverter` expects a string, a boolean, or a number.
 
 To learn this information the converter deserializes and boxes the strongly typed primitive at most once across all runs. The custom converter must behave predicably.
 
@@ -176,3 +175,28 @@ class AgeConverter : JsonConverter<Age>
     }
 }
 ```
+
+### Number handling
+
+Numbers are preferentially wrapped in `JsonNumber`.
+Any valid JSON number value can serialize and deserialize `JsonNumber`cheaply and allocation free.
+
+Reflection serialization supports `JsonNumber` as is.
+Always add `JsonNumber` to your `JsonSourceContext` for lossless and optimal number handling:
+
+```csharp
+[JsonSourceGenerationOptions(WriteIndented = true)]
+[JsonSerializable(typeof(JsonNumber))]
+internal partial class SourceGenerationContext : JsonSerializerContext;
+```
+
+If `JsonNumber` is unavailable numeric precision may be lost.
+In that case serialization is attempted in this order of operation:
+
+1. `long`
+2. `ulong`
+3. `BigInteger`
+4. `decimal`
+5. `double`
+
+If all fail the value is treated as text.

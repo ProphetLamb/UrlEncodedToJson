@@ -1,6 +1,6 @@
 ﻿using System.Buffers;
 
-namespace UrlEncodedToJson;
+namespace UrlEncodedToJson.Text;
 
 internal ref struct ValueStringBuilder(Span<char> initialBuffer, char[]? arrayFromPool = null)
 {
