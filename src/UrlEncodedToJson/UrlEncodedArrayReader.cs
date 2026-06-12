@@ -113,7 +113,7 @@ internal readonly ref struct UrlEncodedArrayReader(
         switch (typeInfo.Kind)
         {
             case JsonTypeInfoKind.Enumerable:
-                GetOrCreateArray(index).Add(converter.CreateStringNode(value));
+                GetOrCreateArray(index).Add(converter.StringToValue(value, typeInfo));
                 return;
             case JsonTypeInfoKind.None:
                 array[index] = converter.StringToValue(value, typeInfo);
