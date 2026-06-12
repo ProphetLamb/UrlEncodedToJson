@@ -125,6 +125,7 @@ internal ref struct UrlEncodedWriter(UrlEncodedElementConverter converter, IBuff
             if (item.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             {
                 index++;
+                forcePrimitiveArrayIndexes = true; // when omitting null elements indexes must be used
                 continue;
             }
 
