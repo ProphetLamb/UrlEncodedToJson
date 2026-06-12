@@ -166,8 +166,8 @@ In this case the simple value deserialization is attempted as a number.
 2. Then the converter learns, to handle `null` as `null`, instead of text.
 
 From this point on the `AgeConverter` is no longer queried:
-- When encountering a quey value that can be interpreted as a number, then a number JSON token is generated.
-- When encountering a quey value that can be interpreted as null, then the null JSON token is generated.
+- When encountering a query value that can be interpreted as a number, then a number JSON token is generated.
+- When encountering a query value that can be interpreted as null, then the null JSON token is generated.
 
 ```csharp
 [JsonConverter(typeof(AgeConverter))]
