@@ -290,7 +290,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
     private JsonValue? CreateStringNode(ReadOnlySpan<char> value, bool maybeNullLiteral)
     {
-        return value.IsEmpty || (maybeNullLiteral && JsonConstants.IsNullLiteral(value)) ? null : JsonValue.Create(value.ToString(), NodeOptions);
+        return maybeNullLiteral && JsonConstants.IsNullLiteral(value) ? null : JsonValue.Create(value.ToString(), NodeOptions);
     }
 
     private JsonValue? CreateNumberNode(ReadOnlySpan<char> value, string? backingString = null)
