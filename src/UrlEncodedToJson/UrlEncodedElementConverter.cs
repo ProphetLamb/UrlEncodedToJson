@@ -196,28 +196,28 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
     internal JsonNode? StringToValue(ReadOnlySpan<char> value, JsonTypeInfo typeInfo)
     {
-        var type = Nullable.GetUnderlyingType(typeInfo.Type) ?? typeInfo.Type;
-        if (type == typeof(string) || type == typeof(char))
-        {
-            return CreateStringNode(value);
-        }
-
         if (value.IsEmpty)
         {
             return null;
         }
 
+        var type = Nullable.GetUnderlyingType(typeInfo.Type) ?? typeInfo.Type;
         // Handle types that do not serialize to string
         // When encountering an implausible case default to string and let json handle it
+        var maybeNull = type != typeInfo.Type || type.IsClass;
+        if (type == typeof(string) || type == typeof(char))
+        {
+            return CreateStringNode(value, maybeNull);
+        }
 
         if (type == typeof(bool))
         {
-            return CreateBooleanNode(value) ?? CreateStringNode(value);
+            return CreateBooleanNode(value) ?? CreateStringNode(value, maybeNull);
         }
 
         if (type.IsPrimitive || type == typeof(decimal) || type.IsEnum)
         {
-            return CreateNumberNode(value) ?? CreateStringNode(value);
+            return CreateNumberNode(value) ?? CreateStringNode(value, maybeNull);
         }
 
         // Unable to statically analyze the JSON value for the type
@@ -242,7 +242,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
         if ((serializeAsKind & SerializeAsKind.String) != default)
         {
-            return CreateStringNode(value);
+            return CreateStringNode(value, maybeNull);
         }
 
         // If the value is one well-formed json literal: null, a number, or a boolean; attempt to deserialize the string then serialize to node,
@@ -254,7 +254,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             _typeCache.AddSerializeAsKind(typeInfo, nodeKind);
         }
 
-        return reserialized ?? CreateStringNode(value);
+        return reserialized ?? CreateStringNode(value, maybeNull);
 
         static object? DeserializeUnsafe(ReadOnlySpan<char> value, JsonTypeInfo typeInfo)
         {
@@ -288,14 +288,9 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         }
     }
 
-    internal JsonNode CreateStringNode(ReadOnlySpan<char> value)
+    private JsonValue? CreateStringNode(ReadOnlySpan<char> value, bool maybeNullLiteral)
     {
-        return JsonValue.Create(value.ToString(), NodeOptions);
-    }
-
-    internal JsonNode CreateStringNode(string value)
-    {
-        return JsonValue.Create(value, NodeOptions);
+        return value.IsEmpty || (maybeNullLiteral && JsonConstants.IsNullLiteral(value)) ? null : JsonValue.Create(value.ToString(), NodeOptions);
     }
 
     private JsonValue? CreateNumberNode(ReadOnlySpan<char> value, string? backingString = null)
