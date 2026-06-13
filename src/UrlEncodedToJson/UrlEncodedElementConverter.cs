@@ -293,30 +293,15 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         return maybeNullLiteral && JsonConstants.IsNullLiteral(value) ? null : JsonValue.Create(value.ToString(), NodeOptions);
     }
 
-    private JsonValue? CreateNumberNode(ReadOnlySpan<char> value, string? backingString = null)
+    private JsonValue? CreateNumberNode(ReadOnlySpan<char> value)
     {
         // Guards against named literals Infinity, -Infinity, NaN
-        if (!JsonNumber.NumberComponents.TryParse(value, out var components))
+        if (!ValueJsonNumber.TryParse(value, out var jsonNumber))
         {
             return null;
         }
 
-        // Prefer unlimited precision datatypes over attempting multiple parses
-        // if the backing ITypeInfoResolver does not support JsonNumber, fallback to high precision alternatives
-        // this might be the case when using JsonSourceContext
-        if (options.GetTypeInfo(typeof(JsonNumber)) is JsonTypeInfo<JsonNumber> jsonTypeInfo)
-        {
-            return JsonValue.Create(
-                new JsonNumber(backingString ?? value.ToString(), components),
-                jsonTypeInfo,
-                NodeOptions
-            );
-        }
-
-        var isInteger = components.IsInteger(value.Length);
-
-        // Attempt alternative high precision number parse
-        if (isInteger
+        if (jsonNumber.MaybeInt64
             && long.TryParse(
                 value,
                 NumberStyles.Integer,
@@ -327,7 +312,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             return JsonValue.Create(longValue, NodeOptions);
         }
 
-        if (isInteger
+        if (jsonNumber.MaybeUInt64
             && ulong.TryParse(
                 value,
                 NumberStyles.Integer,
@@ -338,7 +323,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             return JsonValue.Create(ulongValue, NodeOptions);
         }
 
-        if (isInteger && options.GetTypeInfo(typeof(BigInteger)) is JsonTypeInfo<BigInteger> bigIntegerType)
+        if (jsonNumber.IsInteger && options.GetTypeInfo(typeof(BigInteger)) is JsonTypeInfo<BigInteger> bigIntegerType)
         {
             if (BigInteger.TryParse(
                     value,
@@ -351,7 +336,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             }
         }
 
-        if (decimal.TryParse(
+        if (jsonNumber.MaybeExactDecimal && decimal.TryParse(
                 value,
                 NumberStyles.Float,
                 CultureInfo.InvariantCulture,
@@ -359,6 +344,17 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             ))
         {
             return JsonValue.Create(decimalValue, NodeOptions);
+        }
+
+        // if the backing ITypeInfoResolver does not support JsonNumber, fallback to double
+        // this might be the case when using JsonSourceContext
+        if (options.GetTypeInfo(typeof(JsonNumber)) is JsonTypeInfo<JsonNumber> jsonNumberType)
+        {
+            return JsonValue.Create(
+                jsonNumber.ToJsonNumber(),
+                jsonNumberType,
+                NodeOptions
+            );
         }
 
         if (double.TryParse(

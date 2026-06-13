@@ -200,13 +200,13 @@ Always add `JsonNumber` to your `JsonSourceContext` for lossless and optimal num
 internal partial class SourceGenerationContext : JsonSerializerContext;
 ```
 
-If `JsonNumber` is unavailable numeric precision may be lost.
-In that case serialization is attempted in this order of operation:
+Serialization is attempted in this order of operation:
 
 1. `long`
 2. `ulong`
-3. `BigInteger`
-4. `decimal`
-5. `double`
+3. `BigInteger` (if supported)
+4. `decimal` (if exact)
+5. `JsonNumber` (if supported)
+6. `double`
 
 If all fail the value is treated as text.
