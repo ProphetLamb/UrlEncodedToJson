@@ -10,7 +10,7 @@ internal readonly ref struct UrlEncodedObjectReader(
     UrlEncodedElementConverter converter,
     JsonObject obj,
     JsonTypeInfo typeInfo,
-    NestingTrace trace
+    QueryPath trace
 )
 {
     public void AddObjectValueEscaped(ReadOnlySpan<char> path, ReadOnlySpan<char> escapedValue)
@@ -30,6 +30,7 @@ internal readonly ref struct UrlEncodedObjectReader(
 
     public void AddObjectValue(ReadOnlySpan<char> path, ReadOnlySpan<char> value)
     {
+        converter.ThrowIfMaxDepthExceeded(trace);
         if (typeInfo.Kind != JsonTypeInfoKind.Object)
         {
             return;
@@ -97,6 +98,7 @@ internal readonly ref struct UrlEncodedObjectReader(
 
     public void AddDictionaryValue(ReadOnlySpan<char> path, ReadOnlySpan<char> value)
     {
+        converter.ThrowIfMaxDepthExceeded(trace);
         var (escapedKey, childPath) = UrlEncodedElementConverter.TakeFromPath(path);
         var key = UriSpan.UnescapeDataString(escapedKey);
         if (childPath.IsEmpty)
@@ -136,7 +138,7 @@ internal readonly ref struct UrlEncodedObjectReader(
             case JsonTypeInfoKind.Object:
             case JsonTypeInfoKind.Dictionary:
             default:
-                UrlEncodedElementConverter.ThrowInvalidLeafTypeException(trace[key], value.ToString(), typeInfo);
+                ThrowHelper.ThrowInvalidLeafTypeException(trace[key], value.ToString(), typeInfo);
                 return;
         }
     }

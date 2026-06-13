@@ -253,6 +253,6 @@ internal ref struct UrlEncodedWriter(UrlEncodedElementConverter converter, IBuff
 
     private readonly JsonTypeInfo GetElementTypeInfo(JsonTypeInfo typeInfo, string path)
     {
-        return converter.GetElementTypeInfo(typeInfo, NestingTrace.Literal(path));
+        return converter.GetElementTypeInfo(typeInfo, QueryPath.Literal(path));
     }
 }

@@ -11,7 +11,7 @@ internal readonly ref struct UrlEncodedArrayReader(
     UrlEncodedElementConverter converter,
     JsonArray array,
     JsonTypeInfo typeInfo,
-    NestingTrace trace
+    QueryPath trace
 )
 {
     public void AddArrayValueEscaped(ReadOnlySpan<char> path, ReadOnlySpan<char> escapedValue)
@@ -30,6 +30,7 @@ internal readonly ref struct UrlEncodedArrayReader(
     }
     public void AddArrayValue(ReadOnlySpan<char> path, ReadOnlySpan<char> value)
     {
+        converter.ThrowIfMaxDepthExceeded(trace);
         var (escapedIndex, childPath) = UrlEncodedElementConverter.TakeFromPath(path);
 
         if (!int.TryParse(
@@ -43,6 +44,11 @@ internal readonly ref struct UrlEncodedArrayReader(
             array.Add(null);
             AddLeafValue(array.Count - 1, value);
             return;
+        }
+
+        if (index >= 0X7FFFFFC7)
+        {
+            ThrowHelper.ThrowArrayMaxLengthExceeded();
         }
 
         while (array.Count <= index)
@@ -121,7 +127,7 @@ internal readonly ref struct UrlEncodedArrayReader(
             case JsonTypeInfoKind.Object:
             case JsonTypeInfoKind.Dictionary:
             default:
-                UrlEncodedElementConverter.ThrowInvalidLeafTypeException(trace[index], value.ToString(), typeInfo);
+                ThrowHelper.ThrowInvalidLeafTypeException(trace[index], value.ToString(), typeInfo);
                 return;
         }
     }

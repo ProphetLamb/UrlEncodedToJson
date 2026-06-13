@@ -12,21 +12,22 @@ internal enum NestingTraceConnection
 }
 
 [DebuggerDisplay("{ToString(),nq}")]
-internal sealed class NestingTrace(NestingTrace? parent, string? key, int index, NestingTraceConnection connection)
+internal sealed class QueryPath(QueryPath? parent, string? key, int index, NestingTraceConnection connection, int depth)
 {
     private string? _toString;
 
-    public NestingTrace? Parent => parent;
+    public QueryPath? Parent => parent;
     public string? Key => key;
     public int Index => index;
+    public int Depth => depth;
     public NestingTraceConnection Connection => connection;
 
     [field: AllowNull]
-    public static NestingTrace Root => field ??= Literal("$");
+    public static QueryPath Root => field ??= Literal("$");
 
-    public static NestingTrace Literal(string path)
+    public static QueryPath Literal(string path)
     {
-        return new(null, path, -1, NestingTraceConnection.Literal);
+        return new(null, path, -1, NestingTraceConnection.Literal, 0);
     }
 
     public override string ToString()
@@ -34,9 +35,9 @@ internal sealed class NestingTrace(NestingTrace? parent, string? key, int index,
         return _toString ??= CreateToString();
     }
 
-    public NestingTrace this[string childKey] => new(this, childKey, -1, NestingTraceConnection.Field);
+    public QueryPath this[string childKey] => new(this, childKey, -1, NestingTraceConnection.Field, Depth + 1);
 
-    public NestingTrace this[int childIndex] => new(this, null, childIndex, NestingTraceConnection.Index);
+    public QueryPath this[int childIndex] => new(this, null, childIndex, NestingTraceConnection.Index, Depth + 1);
 
     private string CreateToString()
     {

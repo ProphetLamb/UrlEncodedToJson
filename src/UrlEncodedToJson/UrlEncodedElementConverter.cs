@@ -1,5 +1,4 @@
 ﻿using System.Buffers;
-using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
 using System.Globalization;
 using System.Numerics;
@@ -77,7 +76,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             this,
             new(NodeOptions),
             typeInfo,
-            NestingTrace.Root
+            QueryPath.Root
         );
 
         foreach (var (key, value) in new NameValueEnumerable(query))
@@ -95,12 +94,12 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
     private JsonArray RewriteEnumerable(ReadOnlySpan<char> query, JsonTypeInfo typeInfo)
     {
-        var valueTypeInfo = GetElementTypeInfo(typeInfo, NestingTrace.Root);
+        var valueTypeInfo = GetElementTypeInfo(typeInfo, QueryPath.Root);
         UrlEncodedArrayReader array = new(
             this,
             new(NodeOptions),
             valueTypeInfo,
-            NestingTrace.Root
+            QueryPath.Root
         );
 
         foreach (var (key, value) in new NameValueEnumerable(query))
@@ -113,12 +112,12 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
     private JsonObject RewriteDictionary(ReadOnlySpan<char> query, JsonTypeInfo typeInfo)
     {
-        var valueTypeInfo = GetElementTypeInfo(typeInfo, NestingTrace.Root);
+        var valueTypeInfo = GetElementTypeInfo(typeInfo, QueryPath.Root);
         UrlEncodedObjectReader root = new(
             this,
             new(NodeOptions),
             valueTypeInfo,
-            NestingTrace.Root
+            QueryPath.Root
         );
 
         foreach (var (key, value) in new NameValueEnumerable(query))
@@ -160,9 +159,9 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         return new(path, "");
     }
 
-    internal JsonTypeInfo GetElementTypeInfo(JsonTypeInfo typeInfo, NestingTrace trace)
+    internal JsonTypeInfo GetElementTypeInfo(JsonTypeInfo typeInfo, QueryPath trace)
     {
-        var elementType = typeInfo.ElementType ?? ThrowMissingElementTypeException(trace, typeInfo);
+        var elementType = typeInfo.ElementType ?? ThrowHelper.ThrowMissingElementTypeException(trace, typeInfo);
         return GetTypeInfo(elementType);
     }
 
@@ -440,25 +439,11 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         };
     }
 
-    [DoesNotReturn, MethodImpl(MethodImplOptions.NoInlining)]
-    internal static void ThrowInvalidLeafTypeException(NestingTrace trace, string value, JsonTypeInfo typeInfo)
+    internal void ThrowIfMaxDepthExceeded(QueryPath trace)
     {
-        throw new JsonException(
-            "Unable to convert the value to the desired type: Expected a enumerable, or simple value according to metadata, but got a dictionary or object type",
-            trace.ToString(),
-            null,
-            null
-        ) { Data = { ["Value"] = value, ["TypeInfo"] = typeInfo } };
-    }
-
-    [DoesNotReturn, MethodImpl(MethodImplOptions.NoInlining)]
-    internal static Type ThrowMissingElementTypeException(NestingTrace trace, JsonTypeInfo typeInfo)
-    {
-        throw new JsonException(
-            "Unable to convert the value to the desired type: Expected an enumerable or dictionary according to metadata, but got a object, simple value",
-            trace.ToString(),
-            null,
-            null
-        ) { Data = { ["TypeInfo"] = typeInfo } };
+        if (trace.Depth > options.MaxDepth)
+        {
+            ThrowHelper.ThrowMaxDepthExceededException(trace);
+        }
     }
 }
