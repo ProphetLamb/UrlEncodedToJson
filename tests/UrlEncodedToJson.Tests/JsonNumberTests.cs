@@ -34,10 +34,13 @@ public sealed class JsonNumberTests
 
         foreach (var text in zeroInputs)
         {
-            var ok = JsonNumber.TryParse(text, CultureInfo.InvariantCulture, out var value);
+            var ok = JsonNumber.TryParse(text, out var value);
 
-            Assert.That(ok, Is.True, $"Expected TryParse to succeed for '{text}'.");
-            Assert.That(ToDecimal(value), Is.Zero);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(ok, Is.True, $"Expected TryParse to succeed for '{text}'.");
+                Assert.That(ToDecimal(value), Is.Zero);
+            }
         }
     }
 
@@ -81,7 +84,7 @@ public sealed class JsonNumberTests
     [TestCase(" 1 2 ")]
     public void TryParse_InvalidInputs_ReturnFalse(string text)
     {
-        var ok = JsonNumber.TryParse(text, CultureInfo.InvariantCulture, out var value);
+        var ok = JsonNumber.TryParse(text, out var value);
 
         using (Assert.EnterMultipleScope())
         {
@@ -121,7 +124,7 @@ public sealed class JsonNumberTests
 
         var json = expectedCanonical; // must be legal JSON numeric syntax
 
-        var value = JsonSerializer.Deserialize<JsonNumber>(json, JsonOptions);
+        var value = JsonSerializer.Deserialize<JsonNumber>(json ?? "", JsonOptions);
 
         Assert.That(value.ToString(), Is.EqualTo(expectedCanonical));
     }
@@ -177,11 +180,6 @@ public sealed class JsonNumberTests
         Assert.That(original, Is.EqualTo(deserialized));
     }
 
-    [TestCase("\"\"")]
-    [TestCase("\" \"")]
-    [TestCase("\"abc\"")]
-    [TestCase("\"1e\"")]
-    [TestCase("\".\"")]
     [TestCase("true")]
     [TestCase("false")]
     [TestCase("null")]
@@ -190,6 +188,16 @@ public sealed class JsonNumberTests
     public void JsonSerializer_InvalidJsonInput_Throws(string json)
     {
         Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<JsonNumber>(json, JsonOptions));
+    }
+
+    [TestCase("\"\"")]
+    [TestCase("\" \"")]
+    [TestCase("\"abc\"")]
+    [TestCase("\"1e\"")]
+    [TestCase("\".\"")]
+    public void JsonSerializer_InvalidFormatInput_Throws(string json)
+    {
+        Assert.Throws<FormatException>(() => JsonSerializer.Deserialize<JsonNumber>(json, JsonOptions));
     }
 
     #endregion
@@ -205,12 +213,12 @@ public sealed class JsonNumberTests
         {
             var text = CreateRandomNumericLiteral(rng);
 
-            var ok1 = JsonNumber.TryParse(text, CultureInfo.InvariantCulture, out var first);
+            var ok1 = JsonNumber.TryParse(text, out var first);
             Assert.That(ok1, Is.True, $"Expected generated numeric literal to parse: '{text}'");
 
             var canonical = first.ToString();
 
-            var ok2 = JsonNumber.TryParse(canonical, CultureInfo.InvariantCulture, out var second);
+            var ok2 = JsonNumber.TryParse(canonical, out var second);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(ok2, Is.True, $"Expected canonical text to parse: '{canonical}' from '{text}'");
@@ -232,7 +240,7 @@ public sealed class JsonNumberTests
 
             Assert.DoesNotThrow(() =>
             {
-                var ok = JsonNumber.TryParse(text, CultureInfo.InvariantCulture, out _);
+                var ok = JsonNumber.TryParse(text, out _);
                 if (!ok)
                 {
                     sawFailure = true;
@@ -255,7 +263,7 @@ public sealed class JsonNumberTests
             // G29 is the conventional round-trip-ish format for decimal textual representation
             var text = value.ToString("G29", CultureInfo.InvariantCulture);
 
-            var ok = JsonNumber.TryParse(text, CultureInfo.InvariantCulture, out var parsed);
+            var ok = JsonNumber.TryParse(text, out var parsed);
             Assert.That(ok, Is.True, $"Expected decimal text to parse: '{text}'");
 
             var reconstructed = ToDecimal(parsed);
@@ -270,7 +278,7 @@ public sealed class JsonNumberTests
 
     private static JsonNumber ParseOrFail(string text)
     {
-        var ok = JsonNumber.TryParse(text, CultureInfo.InvariantCulture, out var value);
+        var ok = JsonNumber.TryParse(text, out var value);
         Assert.That(ok, Is.True, $"Expected TryParse to succeed for '{text}'.");
         return value;
     }
