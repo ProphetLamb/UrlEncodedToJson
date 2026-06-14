@@ -17,7 +17,7 @@ public partial class UrlEncodedSerializer
     /// <param name="json">The JSON to parse and deserialize.</param>
     /// <returns>The URL-encoded string if any; otherwise <c>null</c>.</returns>
     [Pure]
-    internal static string? Deserialize<T>(this UrlEncodedElementConverter converter, ReadOnlySpan<char> json)
+    internal static string Deserialize<T>(this UrlEncodedElementConverter converter, ReadOnlySpan<char> json)
     {
         return converter.Deserialize<T>(ParseElement(converter, json));
     }
@@ -31,7 +31,7 @@ public partial class UrlEncodedSerializer
     /// <param name="type">The contract type to use when deserializing.</param>
     /// <returns>The URL-encoded string if any; otherwise <c>null</c>.</returns>
     [Pure]
-    internal static string? Deserialize(this UrlEncodedElementConverter converter, ReadOnlySpan<char> json, Type type)
+    internal static string Deserialize(this UrlEncodedElementConverter converter, ReadOnlySpan<char> json, Type type)
     {
         return converter.Deserialize(ParseElement(converter, json), type);
     }
@@ -71,7 +71,7 @@ public partial class UrlEncodedSerializer
     /// <param name="element">The JSON element containing the URL-encoded element.</param>
     /// <returns>The URL-encoded string if any; otherwise <c>null</c>.</returns>
     [Pure]
-    internal static string? Deserialize<T>(this UrlEncodedElementConverter converter, JsonElement element)
+    internal static string Deserialize<T>(this UrlEncodedElementConverter converter, JsonElement element)
     {
         return converter.Deserialize(element, typeof(T));
     }
@@ -84,7 +84,7 @@ public partial class UrlEncodedSerializer
     /// <param name="type">The contract type.</param>
     /// <returns>The URL-encoded element equivalent to the <paramref name="element"/>.</returns>
     [Pure]
-    internal static string? Deserialize(this UrlEncodedElementConverter converter, JsonElement element, Type type)
+    internal static string Deserialize(this UrlEncodedElementConverter converter, JsonElement element, Type type)
     {
         return converter.Deserialize(element, converter.GetTypeInfo(type));
     }

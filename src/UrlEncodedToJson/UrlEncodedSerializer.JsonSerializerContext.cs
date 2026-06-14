@@ -16,7 +16,7 @@ public static partial class UrlEncodedSerializer
     /// <param name="json">The JSON to parse and deserialize.</param>
     /// <param name="context">The source-generated serializer context providing type metadata.</param>
     /// <returns>The URL-encoded string equivalent to the JSON if any; otherwise <c>null</c>.</returns>
-    public static string? Deserialize<T>(ReadOnlySpan<char> json, JsonSerializerContext context)
+    public static string Deserialize<T>(ReadOnlySpan<char> json, JsonSerializerContext context)
     {
         return new UrlEncodedElementConverter(context.Options).Deserialize<T>(json);
     }
@@ -29,7 +29,7 @@ public static partial class UrlEncodedSerializer
     /// <param name="type">The contract type to use when deserializing.</param>
     /// <param name="context">The source-generated serializer context providing type metadata.</param>
     /// <returns>The URL-encoded string equivalent to the JSON if any; otherwise <c>null</c>.</returns>
-    public static string? Deserialize(ReadOnlySpan<char> json, Type type, JsonSerializerContext context)
+    public static string Deserialize(ReadOnlySpan<char> json, Type type, JsonSerializerContext context)
     {
         return new UrlEncodedElementConverter(context.Options).Deserialize(json, type);
     }
@@ -77,7 +77,7 @@ public static partial class UrlEncodedSerializer
     /// <param name="element">The JSON element containing the URL-encoded data.</param>
     /// <param name="context">The source-generated serializer context providing type metadata.</param>
     /// <returns>The URL-encoded string equivalent to the element if any; otherwise <c>null</c>.</returns>
-    public static string? Deserialize<T>(JsonElement element, JsonSerializerContext context)
+    public static string Deserialize<T>(JsonElement element, JsonSerializerContext context)
     {
         return new UrlEncodedElementConverter(context.Options).Deserialize<T>(element);
     }
@@ -90,7 +90,7 @@ public static partial class UrlEncodedSerializer
     /// <param name="type">The contract type to use when deserializing.</param>
     /// <param name="context">The source-generated serializer context providing type metadata.</param>
     /// <returns>The URL-encoded string equivalent to the element if any; otherwise <c>null</c>.</returns>
-    public static string? Deserialize(JsonElement element, Type type, JsonSerializerContext context)
+    public static string Deserialize(JsonElement element, Type type, JsonSerializerContext context)
     {
         return new UrlEncodedElementConverter(context.Options).Deserialize(element, type);
     }

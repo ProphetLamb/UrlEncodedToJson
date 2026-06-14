@@ -21,7 +21,7 @@ public static partial class UrlEncodedSerializer
     /// <returns>The URL-encoded string equivalent to the JSON if any; otherwise <c>null</c>.</returns>
     [Pure]
     [RequiresUnreferencedCode("Calls System.Text.Json.JsonSerializerOptions.Default")]
-    public static string? Deserialize<T>(ReadOnlySpan<char> json, JsonSerializerOptions? options = null)
+    public static string Deserialize<T>(ReadOnlySpan<char> json, JsonSerializerOptions? options = null)
     {
         return ConverterForOption(options).Deserialize<T>(json);
     }
@@ -35,7 +35,7 @@ public static partial class UrlEncodedSerializer
     /// <returns>The URL-encoded string equivalent to the JSON if any; otherwise <c>null</c>.</returns>
     [Pure]
     [RequiresUnreferencedCode("Calls System.Text.Json.JsonSerializerOptions.Default")]
-    public static string? Deserialize(ReadOnlySpan<char> json, Type type, JsonSerializerOptions? options = null)
+    public static string Deserialize(ReadOnlySpan<char> json, Type type, JsonSerializerOptions? options = null)
     {
         return ConverterForOption(options).Deserialize(json, type);
     }
@@ -77,7 +77,7 @@ public static partial class UrlEncodedSerializer
     /// <returns>The URL-encoded string equivalent to the <paramref name="element"/> if any; otherwise <c>null</c>.</returns>
     [Pure]
     [RequiresUnreferencedCode("Calls System.Text.Json.JsonSerializerOptions.Default")]
-    public static string? Deserialize<T>(JsonElement element, JsonSerializerOptions? options = null)
+    public static string Deserialize<T>(JsonElement element, JsonSerializerOptions? options = null)
     {
         return ConverterForOption(options).Deserialize<T>(element);
     }
@@ -91,7 +91,7 @@ public static partial class UrlEncodedSerializer
     /// <returns>The URL-encoded string equivalent to the <paramref name="element"/> if any; otherwise <c>null</c>.</returns>
     [Pure]
     [RequiresUnreferencedCode("Calls System.Text.Json.JsonSerializerOptions.Default")]
-    public static string? Deserialize(JsonElement element, Type type, JsonSerializerOptions? options = null)
+    public static string Deserialize(JsonElement element, Type type, JsonSerializerOptions? options = null)
     {
         return ConverterForOption(options).Deserialize(element, type);
     }
