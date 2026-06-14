@@ -130,7 +130,7 @@ internal readonly ref struct UrlEncodedObjectReader(
         switch (typeInfo.Kind)
         {
             case JsonTypeInfoKind.Enumerable:
-                GetOrCreateArray(key).Add((JsonNode)JsonValue.Create(value.ToString(), converter.NodeOptions));
+                GetOrCreateArray(key).Add(converter.CreateStringNode(value));
                 return;
             case JsonTypeInfoKind.None:
                 obj[key] = converter.StringToValue(value, typeInfo);

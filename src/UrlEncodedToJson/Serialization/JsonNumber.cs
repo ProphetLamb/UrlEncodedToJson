@@ -211,7 +211,7 @@ public readonly struct JsonNumber(string? text, JsonNumber.NumberComponents comp
 
         public override void Write(Utf8JsonWriter writer, JsonNumber value, JsonSerializerOptions options)
         {
-            writer.WriteRawValue(value.Text ?? "0");
+            writer.WriteRawValue(value.Text ?? "0", true);
         }
     }
 }

@@ -287,7 +287,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         }
     }
 
-    private JsonValue? CreateStringNode(ReadOnlySpan<char> value, bool maybeNullLiteral)
+    internal JsonNode? CreateStringNode(ReadOnlySpan<char> value, bool maybeNullLiteral = false)
     {
         return maybeNullLiteral && JsonConstants.IsNullLiteral(value) ? null : JsonValue.Create(value.ToString(), NodeOptions);
     }
