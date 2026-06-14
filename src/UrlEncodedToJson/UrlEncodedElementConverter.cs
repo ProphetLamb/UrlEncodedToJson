@@ -441,7 +441,8 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
     internal void ThrowIfMaxDepthExceeded(QueryPath trace)
     {
-        if (trace.Depth > options.MaxDepth)
+        var maxDepth = options.MaxDepth == 0 ? 64 : options.MaxDepth;
+        if (trace.Depth > maxDepth)
         {
             ThrowHelper.ThrowMaxDepthExceededException(trace);
         }
