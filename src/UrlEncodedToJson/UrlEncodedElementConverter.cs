@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
+using UrlEncodedToJson.Buffers;
 using UrlEncodedToJson.Serialization;
 using UrlEncodedToJson.Text;
 
@@ -27,7 +28,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
     [Pure]
     public string Deserialize(JsonElement element, JsonTypeInfo typeInfo)
     {
-        ArrayBufferWriter<char> writer = new();
+        using PooledBufferWriter<char> writer = new();
         UrlEncodedWriter queryWriter = new(this, null, writer);
         queryWriter.Write(element, typeInfo);
         return new(writer.WrittenSpan);
