@@ -332,6 +332,17 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             return JsonValue.Create(decimalValue, NodeOptions);
         }
 
+        // if the backing ITypeInfoResolver does not support JsonNumber, fallback to BigInteger & double
+        // this might be the case when using JsonSourceContext
+        if (options.GetTypeInfo(typeof(JsonNumber)) is JsonTypeInfo<JsonNumber> jsonNumberType)
+        {
+            return JsonValue.Create(
+                jsonNumber.ToJsonNumber(),
+                jsonNumberType,
+                NodeOptions
+            );
+        }
+
         if (jsonNumber.IsInteger && options.GetTypeInfo(typeof(BigInteger)) is JsonTypeInfo<BigInteger> bigIntegerType)
         {
             if (BigInteger.TryParse(
@@ -343,17 +354,6 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             {
                 return JsonValue.Create(bigIntegerValue, bigIntegerType, NodeOptions);
             }
-        }
-
-        // if the backing ITypeInfoResolver does not support JsonNumber, fallback to double
-        // this might be the case when using JsonSourceContext
-        if (options.GetTypeInfo(typeof(JsonNumber)) is JsonTypeInfo<JsonNumber> jsonNumberType)
-        {
-            return JsonValue.Create(
-                jsonNumber.ToJsonNumber(),
-                jsonNumberType,
-                NodeOptions
-            );
         }
 
         if (double.TryParse(

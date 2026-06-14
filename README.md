@@ -176,12 +176,12 @@ class AgeConverter : JsonConverter<Age>
 {
     public override Age? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        return new(JsonSerializer.Deserialize<int>(ref reader, options));
+        return JsonSerializer.Deserialize<int?>(ref reader, options) is { } v ? new(v) : null;
     }
 
     public override void Write(Utf8JsonWriter writer, Age value, JsonSerializerOptions options)
     {
-        JsonSerializer.Serialize(writer, value.Value, options);
+        JsonSerializer.Serialize(writer, value?.Value, options);
     }
 }
 ```
@@ -204,9 +204,9 @@ Serialization is attempted in this order of operation:
 
 1. `long`
 2. `ulong`
-3. `BigInteger` (if supported)
-4. `decimal` (if exact)
-5. `JsonNumber` (if supported)
+3. `decimal` (if exact)
+4. `JsonNumber` (if supported)
+5. `BigInteger` (if supported)
 6. `double`
 
 If all fail the value is treated as text.
