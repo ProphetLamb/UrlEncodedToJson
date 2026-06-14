@@ -20,6 +20,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
     private static readonly ConditionalWeakTable<JsonSerializerOptions, TypeCache> s_typeCacheByOptions = [];
 
     private readonly TypeCache _typeCache = GetOrCreateTypeCache(options);
+    private readonly Dictionary<QueryPath, JsonTypeInfo> _typeInfoByTrace = [];
 
     internal JsonNodeOptions NodeOptions => GetNodeOptions(options);
 
@@ -49,7 +50,6 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         {
             return CreateEmptyJsonValue(typeInfo);
         }
-
 
         return typeInfo.Kind switch
         {
@@ -158,6 +158,18 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
         }
 
         return new(path, "");
+    }
+
+    internal static NameValue TakeLastFromPath(ReadOnlySpan<char> path)
+    {
+        var index = path.LastIndexOf('.');
+
+        if (index >= 0)
+        {
+            return new(path[..index], path[(index + 1)..]);
+        }
+
+        return new("", path);
     }
 
     internal JsonTypeInfo GetElementTypeInfo(JsonTypeInfo typeInfo, QueryPath trace)
