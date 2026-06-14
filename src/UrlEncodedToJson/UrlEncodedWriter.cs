@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using UrlEncodedToJson.Text;
 
 namespace UrlEncodedToJson;
 
@@ -211,9 +212,8 @@ internal ref struct UrlEncodedWriter(UrlEncodedElementConverter converter, IBuff
         }
 
         {
-            var escapedValue = Uri.EscapeDataString(value);
-            var bytes = writer.GetSpan(Encoding.UTF8.GetMaxByteCount(escapedValue.Length));
-            writer.Advance(Encoding.UTF8.GetBytes(escapedValue, bytes));
+            var bytes = writer.GetSpan(Encoding.UTF8.GetMaxByteCount(value.Length * 3));
+            writer.Advance(UriSpan.EscapeDataString(value, bytes));
         }
     }
 

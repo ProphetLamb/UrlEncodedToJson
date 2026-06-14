@@ -7,27 +7,41 @@ using UrlEncodedToJson.Serialization;
 
 namespace UrlEncodedToJson.Text;
 
-internal static class UriSpan
+internal static partial class UriSpan
 {
-    /// <inheritdoc cref="UnescapeDataStringInplace(int, ReadOnlySpan{char}, Span{char})"/>
+    private static readonly Encoding s_encoding = Encoding.UTF8;
+
+    /// <inheritdoc cref="UnescapeDataString(string)"/>
     public static string UnescapeDataString(scoped ReadOnlySpan<char> s)
     {
-        return UnescapeDataString(s, null);
+        return UnescapeDataString(s, default(string?));
     }
 
-    /// <inheritdoc cref="UnescapeDataStringInplace(int, ReadOnlySpan{char}, Span{char})"/>
+    /// <summary>
+    /// Decodes the URL-encoded text to the output buffer.
+    /// <br/>Decodes `+` as ` `
+    /// </summary>
+    /// <param name="s">The text to decode.</param>
+    /// <returns>The decoded text..</returns>
     public static string UnescapeDataString(string s)
     {
         return UnescapeDataString(s, s);
     }
 
-    /// <inheritdoc cref="UnescapeDataStringInplace(int, ReadOnlySpan{char}, Span{char})"/>
-    public static int UnescapeDataStringInplace(scoped ReadOnlySpan<char> s, scoped Span<char> output)
+
+    /// <summary>
+    /// Decodes the URL-encoded text to the output buffer.
+    /// <br/>Decodes `+` as ` `
+    /// </summary>
+    /// <param name="s">The text to decode.</param>
+    /// <param name="output">The buffer holding the decoded text.</param>
+    /// <returns>The number or characters written to the output, or -1 if the text does not need decoding.</returns>
+    public static int UnescapeDataString(scoped ReadOnlySpan<char> s, scoped Span<char> output)
     {
         var firstNotableIndex = s.IndexOfAny('%', '+');
         if (firstNotableIndex >= 0)
         {
-            return UnescapeDataStringInplace(firstNotableIndex, s, output);
+            return UnescapeDataString(firstNotableIndex, s, output);
         }
 
         return -1;
@@ -45,7 +59,7 @@ internal static class UriSpan
             ? ArrayPool<char>.Shared.Rent(s.Length)
             : null;
         var chars = pooled ?? stackalloc char[s.Length];
-        var written = UnescapeDataStringInplace(firstNotableIndex, s, chars);
+        var written = UnescapeDataString(firstNotableIndex, s, chars);
         var result = chars[..written].ToString();
         if (pooled != null)
         {
@@ -55,14 +69,7 @@ internal static class UriSpan
         return result;
     }
 
-    /// <summary>
-    /// Bespoke `Uri.UnescapeDataString` implementation.
-    /// <list type="bullet">
-    ///  <item>decodes `+` as ` `</item>
-    ///  <item>.NET doesn't support `ReadOnlySpan{char}` until .NET10</item>
-    /// </list>
-    /// </summary>
-    private static int UnescapeDataStringInplace(int firstNotableIndex, scoped ReadOnlySpan<char> s, scoped Span<char> output)
+    private static int UnescapeDataString(int firstNotableIndex, scoped ReadOnlySpan<char> s, scoped Span<char> output)
     {
         Debug.Assert(output.Length >= s.Length, "Output buffer must fit at least the input buffer.");
         ValueStringBuilder vsb = new(output);
@@ -130,7 +137,7 @@ internal static class UriSpan
     {
         var dest = vsb.AppendSpan(byteCount);
         var bytes = MemoryMarshal.CreateReadOnlySpan(ref Unsafe.As<uint, byte>(ref rune), byteCount);
-        var written = Encoding.UTF8.GetChars(bytes, dest);
+        var written = s_encoding.GetChars(bytes, dest);
         vsb.Length -= byteCount - written;
     }
 

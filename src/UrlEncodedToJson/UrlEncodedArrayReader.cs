@@ -20,7 +20,7 @@ internal readonly ref struct UrlEncodedArrayReader(
             ? ArrayPool<char>.Shared.Rent(escapedValue.Length)
             : null;
         var chars = pooled ?? stackalloc char[escapedValue.Length];
-        var written = UriSpan.UnescapeDataStringInplace(escapedValue, chars);
+        var written = UriSpan.UnescapeDataString(escapedValue, chars);
         var value = written >= 0 ? chars[..written] : escapedValue;
         AddArrayValue(path, value);
         if (pooled != null)

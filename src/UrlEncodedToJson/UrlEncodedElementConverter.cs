@@ -182,7 +182,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             ? ArrayPool<char>.Shared.Rent(escapedValue.Length)
             : null;
         var chars = pooled ?? stackalloc char[escapedValue.Length];
-        var written = UriSpan.UnescapeDataStringInplace(escapedValue, chars);
+        var written = UriSpan.UnescapeDataString(escapedValue, chars);
         var value = written >= 0 ? chars[..written] : escapedValue;
         var result = StringToValue(value, typeInfo);
         if (pooled != null)
@@ -396,7 +396,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             ? ArrayPool<char>.Shared.Rent(escapedPropertyName.Length)
             : null;
         var chars = pooled ?? stackalloc char[escapedPropertyName.Length];
-        var written = UriSpan.UnescapeDataStringInplace(escapedPropertyName, chars);
+        var written = UriSpan.UnescapeDataString(escapedPropertyName, chars);
         var propertyName = written >= 0 ? chars[..written] : escapedPropertyName;
         var propertyInfo = _typeCache.FindProperty(
             typeInfo,
