@@ -118,7 +118,7 @@ internal static partial class UriSpan
     private static bool IsUnreserved(char c)
     {
         // unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
-        if ((char)(c | 0x20) is (>= 'a' and <= 'z') or (>= '0' and <= '9'))
+        if (c is >= '0' and <= '9' || (char)(c | 0x20) is >= 'a' and <= 'z')
         {
             return true;
         }

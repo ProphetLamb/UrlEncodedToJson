@@ -41,7 +41,7 @@ internal sealed class PooledBufferWriter<T> : IBufferWriter<T>, IDisposable
             throw new ArgumentException(null, nameof(initialCapacity));
         }
 
-        _buffer = new T[initialCapacity];
+        _buffer = ArrayPool<T>.Shared.Rent(initialCapacity);
         _index = 0;
     }
 

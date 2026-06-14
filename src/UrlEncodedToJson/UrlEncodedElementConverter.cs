@@ -28,7 +28,7 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
     [Pure]
     public string Deserialize(JsonElement element, JsonTypeInfo typeInfo)
     {
-        using PooledBufferWriter<char> writer = new();
+        using PooledBufferWriter<char> writer = new(JsonMarshal.GetRawUtf8Value(element).Length * 3);
         UrlEncodedWriter queryWriter = new(this, null, writer);
         queryWriter.Write(element, typeInfo);
         return new(writer.WrittenSpan);
