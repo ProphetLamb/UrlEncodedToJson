@@ -231,16 +231,15 @@ internal readonly ref struct ValueJsonNumber(ReadOnlySpan<char> text, JsonNumber
     public bool MaybeUInt64 => UnsignedInteger.Length <= 20 && Fraction.IsEmpty && Sign != '-';
 
     // Decimal is accurate up to 29 digits, but the result is inexact for values with more than 28 digits
-    public bool MaybeExactDecimal =>
-        ExponentSmallValue is var exp && UnsignedInteger.Length + exp < 29 && Fraction.Length <= exp;
+    public bool MaybeExactDecimal => UnsignedInteger.Length + Fraction.Length + SmallExponentAbs < 29;
 
-    private int ExponentSmallValue => Exponent.IsEmpty ? 0 :
+    private int SmallExponentAbs => Exponent.IsEmpty ? 0 :
         int.TryParse(
             Exponent,
             NumberStyles.Integer,
             CultureInfo.InvariantCulture,
             out var exp
-        ) ? exp : int.MaxValue;
+        ) ? Math.Abs(exp) : int.MaxValue;
 
     public static ValueJsonNumber Parse(ReadOnlySpan<char> s)
     {
