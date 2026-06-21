@@ -259,14 +259,30 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
 
         // If the value is one well-formed json literal: null, a number, or a boolean; attempt to deserialize the string then serialize to node,
         // otherwise as well as on failure pass the type as a string
-        var reserialized = ReserializeNode(value, typeInfo);
-        var nodeKind = TypeCache.KindFromNode(reserialized, value);
-        if ((serializeAsKind | nodeKind) != serializeAsKind)
+        var nodeKind = TryReserializeValue(value, typeInfo, out var reserialized);
+        if (nodeKind == default)
         {
-            _typeCache.AddSerializeAsKind(typeInfo, nodeKind);
+            ReserializeStringUnsafe(value, typeInfo);
+            nodeKind = SerializeAsKind.String;
         }
 
-        return reserialized ?? CreateStringNode(value, maybeNull);
+        _typeCache.AddSerializeAsKind(typeInfo, nodeKind);
+        return reserialized ?? CreateStringNode(value);
+
+        static SerializeAsKind TryReserializeValue(ReadOnlySpan<char> value, JsonTypeInfo jsonTypeInfo, out JsonNode? reserialized)
+        {
+            try
+            {
+                var boxed = DeserializeUnsafe(value, jsonTypeInfo);
+                reserialized = JsonSerializer.SerializeToNode(boxed, jsonTypeInfo);
+                return TypeCache.KindFromNode(reserialized, value);
+            }
+            catch (JsonException)
+            {
+                reserialized = null;
+                return default;
+            }
+        }
 
         static object? DeserializeUnsafe(ReadOnlySpan<char> value, JsonTypeInfo typeInfo)
         {
@@ -286,17 +302,16 @@ internal readonly partial struct UrlEncodedElementConverter(JsonSerializerOption
             return result;
         }
 
-        static JsonNode? ReserializeNode(ReadOnlySpan<char> s, JsonTypeInfo jsonTypeInfo)
+        static void ReserializeStringUnsafe(ReadOnlySpan<char> value, JsonTypeInfo typeInfo)
         {
-            try
+            using PooledBufferWriter<byte> buffer = new();
+            using (Utf8JsonWriter writer = new(buffer))
             {
-                var boxed = DeserializeUnsafe(s, jsonTypeInfo);
-                return JsonSerializer.SerializeToNode(boxed, jsonTypeInfo);
+                writer.WriteStringValue(value);
             }
-            catch (JsonException)
-            {
-                return null;
-            }
+
+            Utf8JsonReader reader = new(buffer.WrittenSpan);
+            _ = JsonSerializer.Deserialize(ref reader, typeInfo);
         }
     }
 
